@@ -1,0 +1,9 @@
+# SACHET AI frontend image (Phase 1: dev server only).
+FROM node:20-slim
+
+WORKDIR /app
+COPY package.json ./
+RUN npm install --no-audit --no-fund
+COPY . ./
+EXPOSE 3000
+CMD ["npm", "run", "dev"]

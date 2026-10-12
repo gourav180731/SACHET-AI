@@ -1,0 +1,97 @@
+# SACHET AI backend configuration. Every value overridable via env:
+# SACHET_APP_ENV, SACHET_JWT_SECRET, SACHET_SENSITIVE_MODE, ... (relaxed binding)
+# or standard Spring names. Secrets come from env/vault — never this file.
+server:
+  port: 8000
+
+sachet:
+  app-env: ${SACHET_APP_ENV:dev}
+  app-version: 0.2.0
+  api-prefix: /api/v1
+  cors-origins: ${SACHET_CORS_ORIGINS:http://localhost:3000}
+  jwt-secret: ${SACHET_JWT_SECRET:ThisIsAVerySecureJWTSecretKey32ThatMeets32Ch}
+  jwt-expire-min: ${SACHET_JWT_EXPIRE_MIN:30}
+  sensitive-mode: ${SACHET_SENSITIVE_MODE:true}
+  allow-external-models: ${SACHET_ALLOW_EXTERNAL_MODELS:false}
+  feature-web-search: false
+  feature-cross-tenant-retrieval: false
+  feature-verbose-logging: false
+  storage-path: ${SACHET_STORAGE_PATH:./storage}
+  storage-max-bytes: 10737418240
+  ingestion-max-file-bytes: ${SACHET_INGESTION_MAX_FILE_BYTES:104857600}
+  require-malware-scan: ${SACHET_REQUIRE_MALWARE_SCAN:false}
+  embedding-model-dir: ${SACHET_EMBEDDING_MODEL_DIR:./models/paraphrase-multilingual-minilm-l12-v2}
+  embedding-model-id: sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2
+  embedding-dims: 384
+  embedding-max-tokens: 256
+  embedding-auto-download: ${SACHET_EMBEDDING_AUTO_DOWNLOAD:true}
+  vector-store: ${SACHET_VECTOR_STORE:jvm}
+  retrieval-top-k: 10
+  retrieval-max-top-k: 50
+  retrieval-candidate-cap: 2000
+  evidence-strong: 0.70
+  evidence-moderate: 0.50
+  evidence-limited: 0.30
+  # --- Gemini / LLM Gateway ---
+  gemini-api-key: ${SACHET_GEMINI_API_KEY:}
+  gemini-model: ${SACHET_GEMINI_MODEL:gemini-3.5-flash}
+  gemini-temperature: ${SACHET_GEMINI_TEMPERATURE:0.2}
+  gemini-max-tokens: ${SACHET_GEMINI_MAX_TOKENS:8192}
+  rag-response-modes: detailed,short,bullets,custom
+  default-rag-mode: detailed
+  # --- Voice / wake-word (local, offline) ---
+  # Disabled by default: the wake-word acoustic model is not bundled. When no
+  # engine/model is installed the API reports NOT_CONFIGURED rather than
+  # pretending detection works. See docs/VOICE_WAKEWORD.md.
+  wake-word-enabled: ${SACHET_WAKE_WORD_ENABLED:true}
+  wake-phrase: ${SACHET_WAKE_PHRASE:hello sachet}
+  wake-threshold: ${SACHET_WAKE_THRESHOLD:0.5}
+  wake-cooldown-ms: ${SACHET_WAKE_COOLDOWN_MS:1500}
+  inactivity-timeout-seconds: ${SACHET_INACTIVITY_TIMEOUT_SECONDS:120}
+  listen-timeout-seconds: ${SACHET_LISTEN_TIMEOUT_SECONDS:15}
+  microphone-device: ${SACHET_MICROPHONE_DEVICE:default}
+  # Speech-to-text. "none" (secure default) or "gemini".
+  # gemini requires SACHET_GEMINI_API_KEY and is gated by ModelPolicy.
+  stt-provider: ${SACHET_STT_PROVIDER:gemini}
+  stt-model: ${SACHET_STT_MODEL:gemini-3.5-flash}
+  # Text-to-speech. "none" (secure default) or "gemini".
+  # gemini requires SACHET_GEMINI_API_KEY and is gated by ModelPolicy: the answer
+  # text is derived from retrieved document excerpts, so synthesising it is an
+  # external transfer of document-derived content.
+  tts-provider: ${SACHET_TTS_PROVIDER:gemini}
+  tts-model: ${SACHET_TTS_MODEL:gemini-3.8-flash-tts}
+  wake-model-dir: ${SACHET_WAKE_MODEL_DIR:./models/wake}
+  keywords-file: ${SACHET_KEYWORDS_FILE:keywords.txt}
+  audio-sample-rate: ${SACHET_AUDIO_SAMPLE_RATE:16000}
+  audio-frame-millis: ${SACHET_AUDIO_FRAME_MILLIS:100}
+
+spring:
+  datasource:
+    url: ${SACHET_DATABASE_URL:jdbc:postgresql://localhost:5432/SACHET_AI?user=postgres&password=admin}
+    username: ${SACHET_DB_USER:postgres}
+    password: ${SACHET_DB_PASSWORD:admin}
+    hikari:
+      maximum-pool-size: 10
+      connection-timeout: 3000
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate.jdbc.time_zone: UTC
+    open-in-view: false
+  sql:
+    init:
+      mode: always
+      schema-locations: classpath:db/schema.sql
+      continue-on-error: false # fail fast: schema script is idempotent (IF NOT EXISTS)
+  mvc:
+    throw-exception-if-no-handler-found: true
+    async:
+      request-timeout: 60000
+  web:
+    resources:
+      add-mappings: false
+
+logging:
+  level:
+    ai.sachet: INFO

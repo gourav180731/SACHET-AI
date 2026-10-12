@@ -1,0 +1,26 @@
+# PHASE 5 — GAP ANALYSIS
+
+| Feature | Current frontend status | Backend API status | Existing endpoint | Required endpoint | Required backend work | Required frontend work | Security considerations | Status |
+|---|---|---|---|---|---|---|---|---|
+| Authentication (login/logout/JWT/protected routes) | Implemented | Available | POST /api/v1/auth/login | — | — | — | None new | IMPLEMENTED |
+| Document list / pagination / classification | Implemented | Available | GET /api/v1/documents | — | — | — | Backend ACL enforced | IMPLEMENTED |
+| Upload / ingestion tracking / retry | Implemented | Available | POST /api/v1/documents, GET/POST /api/v1/ingestion/jobs/{id}[/retry] | — | — | — | Malware scan + validation server-side | IMPLEMENTED |
+| Document details / viewer / pages / in-doc search | Implemented | Available | GET /api/v1/documents/{id}, /chunks | — | — | — | 404 hides existence | IMPLEMENTED |
+| RAG chat / evidence / citations / insufficient evidence | Implemented | Available | POST /api/v1/chat | — | — | — | Permission filtering before LLM | IMPLEMENTED |
+| Authorized search | Implemented | Available | POST /api/v1/search | — | — | — | Permission filtering | IMPLEMENTED |
+| Audit & Activity | Honest empty state only | Service exists (hash-chained AuditService used by auth/ingest/rag) but NO controller | none | GET /api/v1/audit?page=&size= | Add AuditController (paged, metadata only), role-restricted to ADMIN/SECURITY_ADMIN | Audit page table | Never expose content/tokens; backend enforces role | BACKEND MISSING → implemented in Phase 5 |
+| Document Studio — summaries / entities / action items / translate / compare / explain | Disabled placeholder | DocumentStudioService fully implemented, NO controller | none | POST /api/v1/studio/{executive-summary,detailed-summary,key-points,entities,action-items,translate,explain,compare} | Add StudioController | Studio UI wired to real endpoints | Same permission-filtered RagService; agent policy checked | BACKEND MISSING → implemented |
+| Document Studio — PPTX/DOCX artifact generation | IMPLEMENTED (Phase 6) | Yes | POST /api/v1/studio/generate/{docx,pptx} | ArtifactService + LocalStorageService + generated_artifacts table | New entity/service/controller, quota, classification inheritance | Studio Generate tab + Generated Files page | Owner/admin/source-access rule; 404 hides existence; downloads authorized + audited | IMPLEMENTED |
+| Generated Files | IMPLEMENTED (Phase 6) | Yes | GET /api/v1/artifacts, GET /{id}, GET /{id}/download, DELETE /{id} | Same as above | Same as above | Real list with preview/download/delete | Classification inherited from strictest source; no public URLs | IMPLEMENTED |
+| Viewer zoom | Missing | — | — | — | — | Add zoom controls on chunk view | — | FRONTEND MISSING → implemented |
+| Source highlighting / citation navigation | Partial | Chunks carry page/section; no highlight offsets | — | — | — | Navigate via ?page=, highlight chunk containing cited text when match found | No invented coordinates | FRONTEND MISSING → implemented |
+| RBAC-aware UI | Roles parsed but not used for UX | Roles in JWT + ROLE_ authorities | — | — | — | Hide/disable admin-only pages per role (UX only) | Backend @PreAuthorize remains source of truth | FRONTEND MISSING → implemented |
+| 403 / 404 / 500 error UX | Sanitized messages | Generic JSON errors | — | — | — | Ensure no leak | Already ok | IMPLEMENTED |
+| Multilingual architecture | Skeleton dictionary (en) + language list | None | — | — | — | Extract hardcoded strings into t() keys; keep language capability table (UI/STT/TTS/AI) | Never claim unsupported translations | PARTIALLY IMPLEMENTED → completed |
+| Voice interface | IMPLEMENTED (Hello SACHET wake word + Web Speech API) | Yes (Phase 6) | GET /api/v1/voice/capabilities, text chat via /chat | VoiceService + VoiceGateway | Wake word detection, waveform, on-device STT/TTS | Full VoiceControl with SLEEPING/LISTENING/PROCESSING/SPEAKING states | On-device audio processing; only text sent to backend; same authorization | IMPLEMENTED |
+| Security page real state | Static text | /health, /ready only; no policy endpoint | GET /api/v1/health, /ready | — | Keep documented state; don't fabricate | Use /ready as dependency signal | No false claims | PARTIALLY IMPLEMENTED → improved |
+| Search filters (classification/owner/date/language, semantic mode) | IMPLEMENTED (classification filter wired in UI; others via API) | Yes (Phase 6) | POST /api/v1/search (+classification/department/owner/from/to) | SearchController post-retrieval filter | None further | Classification dropdown added | Authorization still enforced in RagService before filters | IMPLEMENTED |
+| Generated file security / downloads | N/A | No artifact API | — | — | — | — | — | N/A |
+| Loading/error/empty states | Implemented | — | — | — | — | Add skeletons for studio/audit/voice | — | IMPLEMENTED (extended) |
+| Secrets scan of frontend | Verified clean | — | — | — | — | `Select-String` audit; no keys in source; tokens only in sessionStorage | Never persist doc content | VERIFIED |
+| GET /auth/me | IMPLEMENTED (Phase 6) | Yes | GET /api/v1/auth/me | AuthController | — | Available for client identity lookup | 401 for unknown/inactive user | IMPLEMENTED |

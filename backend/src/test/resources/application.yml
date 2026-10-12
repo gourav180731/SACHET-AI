@@ -1,0 +1,21 @@
+# Test overrides: isolated H2 database, fixed test secret. Never real credentials.
+sachet:
+  app-env: test
+  jwt-secret: test-only-secret-32-chars-minimum
+  storage-path: ./target/test-storage
+
+spring:
+  datasource:
+    url: jdbc:h2:mem:sachetdb;DB_CLOSE_DELAY=-1
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+  sql:
+    init:
+      mode: always
+      schema-locations: classpath:db/schema.sql
+      continue-on-error: false
