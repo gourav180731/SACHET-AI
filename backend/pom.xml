@@ -79,6 +79,11 @@
       <artifactId>poi-ooxml</artifactId>
       <version>5.3.0</version>
     </dependency>
+    <dependency>
+      <groupId>org.apache.poi</groupId>
+      <artifactId>poi-scratchpad</artifactId>
+      <version>5.3.0</version>
+    </dependency>
 
     <!-- Google Generative AI (Gemini) for streaming chat + TTS.
      Upgraded from 0.7.0 because 0.7.0 exposes no Modality type and cannot

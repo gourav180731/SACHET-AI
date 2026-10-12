@@ -76,7 +76,10 @@ export const IngestionStepper = ({ status, errorMessage }) => {
 };
 
 /* ---------------- Upload zone ---------------- */
-export const UploadZone = ({ onFiles, accept }) => {
+export const UploadZone = ({
+  onFiles,
+  accept = ".pdf,.doc,.docx,.ppt,.pptx,.txt,.md,.csv,.rtf,.html,.htm,.json,.xml"
+}) => {
   const [drag, setDrag] = useState(false);
   const inputRef = useRef(null);
 
@@ -96,7 +99,7 @@ export const UploadZone = ({ onFiles, accept }) => {
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.6} d="M7 16a4 4 0 01-.88-7.9A5 5 0 1115.9 6H16a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
       </svg>
       <p className="ui-upload__title">Drop files here or click to browse</p>
-      <p className="ui-upload__hint">Supported formats: PDF, DOCX, PPTX, TXT, MD</p>
+      <p className="ui-upload__hint">Supported formats: PDF, DOC, DOCX, PPT, PPTX, TXT, MD, CSV, RTF, HTML, JSON, XML</p>
       <input
         ref={inputRef}
         type="file"

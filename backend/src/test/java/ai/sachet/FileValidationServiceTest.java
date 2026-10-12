@@ -96,6 +96,32 @@ class FileValidationServiceTest {
   }
 
   @Test
+  void validDocPasses() throws Exception {
+    byte[] ole2Header = new byte[] {(byte) 0xD0, (byte) 0xCF, (byte) 0x11, (byte) 0xE0, 0x00, 0x00, 0x00, 0x00};
+    Path f = write("sample.doc", ole2Header);
+    var v = service(1024).validate(f, "sample.doc", ole2Header.length);
+    assertEquals("doc", v.extension());
+    assertEquals("application/msword", v.mimeType());
+  }
+
+  @Test
+  void validPptPasses() throws Exception {
+    byte[] ole2Header = new byte[] {(byte) 0xD0, (byte) 0xCF, (byte) 0x11, (byte) 0xE0, 0x00, 0x00, 0x00, 0x00};
+    Path f = write("sample.ppt", ole2Header);
+    var v = service(1024).validate(f, "sample.ppt", ole2Header.length);
+    assertEquals("ppt", v.extension());
+    assertEquals("application/vnd.ms-powerpoint", v.mimeType());
+  }
+
+  @Test
+  void validCsvPasses() throws Exception {
+    Path f = write("table.csv", "id,name,role\n1,alice,admin\n".getBytes(StandardCharsets.UTF_8));
+    var v = service(1024).validate(f, "table.csv", Files.size(f));
+    assertEquals("csv", v.extension());
+    assertEquals("text/csv", v.mimeType());
+  }
+
+  @Test
   void noOpScannerReportsNotScannedAndNotRequiredByDefault() {
     assertEquals(MalwareScanner.Verdict.NOT_SCANNED,
         new NoOpMalwareScanner().scan(tmp));

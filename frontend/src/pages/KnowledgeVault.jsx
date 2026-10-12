@@ -1,12 +1,15 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { documentsApi, jobsApi } from "../api";
 import {
   Card, UploadZone, Button, IngestionStepper, Select, Input,
-  Alert, useToasts, ToastContainer,
+  Alert, useToasts, ToastContainer, StatusBadge, ClassificationBadge,
 } from "../components/UI";
 
 const CLASSIFICATIONS = ["PUBLIC", "INTERNAL", "RESTRICTED", "CONFIDENTIAL", "SECRET"];
+
+const ALLOWED_EXTS = ["pdf", "doc", "docx", "ppt", "pptx", "txt", "md", "csv", "rtf", "html", "htm", "json", "xml"];
+const ALLOWED_REGEX = new RegExp(`\\.(${ALLOWED_EXTS.join("|")})$`, "i");
 
 const fmtSize = (bytes) => {
   if (!bytes) return "0 B";
@@ -20,21 +23,31 @@ export default function KnowledgeVault() {
   const [title, setTitle] = useState("");
   const [classification, setClassification] = useState("INTERNAL");
   const [department, setDepartment] = useState("");
+  const [autoUpload, setAutoUpload] = useState(true);
   const [uploads, setUploads] = useState([]);
+  const [recentDocs, setRecentDocs] = useState([]);
+  const [loadingDocs, setLoadingDocs] = useState(false);
   const [error, setError] = useState(null);
   const [busyFile, setBusyFile] = useState(null);
   const { toasts, push, success, dismiss } = useToasts();
 
-  const onFiles = useCallback((files) => {
-    const allowed = /\.(pdf|docx|pptx|txt|md)$/i;
-    const accepted = [];
-    const rejected = [];
-    files.forEach((f) => (allowed.test(f.name) ? accepted : rejected.push(f.name)));
-    if (accepted.length) setPending((p) => [...p, ...accepted]);
-    if (rejected.length) push(`Unsupported file type skipped: ${rejected.join(", ")}`, "warning", "Some files were skipped");
-  }, [push]);
+  const loadRecentDocs = useCallback(async () => {
+    setLoadingDocs(true);
+    try {
+      const res = await documentsApi.list(0, 5);
+      if (res?.content) {
+        setRecentDocs(res.content);
+      }
+    } catch {
+      // non-critical if list fails
+    } finally {
+      setLoadingDocs(false);
+    }
+  }, []);
 
-  const removePending = (file) => setPending((p) => p.filter((f) => f !== file));
+  useEffect(() => {
+    loadRecentDocs();
+  }, [loadRecentDocs]);
 
   const pollJob = useCallback(async (jobId, entry) => {
     for (let i = 0; i < 60; i += 1) {
@@ -43,92 +56,294 @@ export default function KnowledgeVault() {
         const job = await jobsApi.get(jobId);
         const next = { ...entry, status: job.status, error: job.errorMessage, attempts: job.attempts };
         setUploads((u) => u.map((x) => (x.jobId === jobId ? next : x)));
-        if (job.status === "READY") { success(`${entry.name} is ready to query.`, "Ingestion complete"); break; }
-        if (job.status === "FAILED") { push(`${entry.name} failed: ${job.errorMessage || "unknown error"}`, "error", "Ingestion failed"); break; }
+        if (job.status === "READY") {
+          success(`${entry.name} is parsed, indexed, and ready to query.`, "Ingestion complete");
+          loadRecentDocs();
+          break;
+        }
+        if (job.status === "FAILED") {
+          push(`${entry.name} ingestion failed: ${job.errorMessage || "unknown error"}`, "error", "Ingestion failed");
+          break;
+        }
       } catch {
         push(`Status polling stopped for ${entry.name}.`, "warning", "Polling interrupted");
         break;
       }
     }
-  }, [push, success]);
+  }, [push, success, loadRecentDocs]);
 
-  const upload = async (file) => {
+  const uploadSingle = useCallback(async (file, customTitle = null) => {
     setError(null);
     setBusyFile(file.name);
     const fd = new FormData();
     fd.append("file", file);
-    if (title) fd.append("title", title);
+    if (customTitle || title) fd.append("title", customTitle || title);
     fd.append("classification", classification);
     if (department) fd.append("department", department);
+
     try {
       const res = await documentsApi.create(fd);
-      const entry = { name: file.name, documentId: res.documentId, jobId: res.jobId, status: res.status, size: file.size };
+      const isDup = !!res.duplicate;
+      const entry = {
+        name: file.name,
+        documentId: res.documentId,
+        jobId: res.jobId,
+        status: res.status || (isDup ? "READY" : "QUEUED"),
+        size: file.size,
+        duplicate: isDup,
+        time: new Date().toLocaleTimeString(),
+      };
       setUploads((u) => [entry, ...u]);
-      removePending(file);
-      push(`${file.name} accepted for ingestion.`, "success", "Upload started");
-      if (res.jobId) pollJob(res.jobId, entry);
+      setPending((p) => p.filter((f) => f !== file));
+
+      if (isDup) {
+        success(`${file.name} is already indexed in vault. Ready to query.`, "Document ready");
+        loadRecentDocs();
+      } else {
+        push(`${file.name} uploaded successfully. Ingestion in progress...`, "info", "Upload started");
+        if (res.jobId) {
+          pollJob(res.jobId, entry);
+        }
+      }
+      return true;
     } catch (e) {
-      setError(e.message);
-      push(e.message, "error", "Upload failed");
+      const msg = e.message || "Failed to upload file.";
+      setError(`${file.name}: ${msg}`);
+      push(msg, "error", `Upload failed (${file.name})`);
+      return false;
     } finally {
       setBusyFile(null);
     }
+  }, [title, classification, department, pollJob, push, success, loadRecentDocs]);
+
+  const onFiles = useCallback((files) => {
+    setError(null);
+    const accepted = [];
+    const rejected = [];
+
+    files.forEach((f) => {
+      if (ALLOWED_REGEX.test(f.name)) {
+        accepted.push(f);
+      } else {
+        rejected.push(f.name);
+      }
+    });
+
+    if (rejected.length) {
+      push(
+        `Unsupported files skipped: ${rejected.join(", ")}. Supported: PDF, DOC, DOCX, PPT, PPTX, TXT, MD, CSV, RTF, HTML, JSON, XML.`,
+        "warning",
+        "Some files were skipped"
+      );
+    }
+
+    if (!accepted.length) return;
+
+    if (autoUpload) {
+      // Direct auto-upload mode: process files sequentially
+      (async () => {
+        for (const file of accepted) {
+          // eslint-disable-next-line no-await-in-loop
+          await uploadSingle(file);
+        }
+      })();
+    } else {
+      setPending((p) => [...p, ...accepted]);
+      push(`${accepted.length} file(s) staged for review. Click "Upload All" to ingest.`, "info", "Files added");
+    }
+  }, [autoUpload, uploadSingle, push]);
+
+  const removePending = (file) => setPending((p) => p.filter((f) => f !== file));
+
+  const uploadAll = async () => {
+    const queue = [...pending];
+    for (const f of queue) {
+      // eslint-disable-next-line no-await-in-loop
+      await uploadSingle(f);
+    }
+    setTitle("");
   };
 
   const retry = async (jobId) => {
     try {
       const job = await jobsApi.retry(jobId);
       setUploads((u) => u.map((x) => (x.jobId === jobId ? { ...x, status: job.status, error: null } : x)));
-      push("Retry requested.", "info");
+      push("Ingestion retry requested.", "info");
+      const target = uploads.find((x) => x.jobId === jobId);
+      if (target) pollJob(jobId, target);
     } catch (e) {
       push(e.message, "error", "Retry failed");
     }
   };
 
-  const uploadAll = async () => {
-    const queue = [...pending];
-    for (const f of queue) {
-      // eslint-disable-next-line no-await-in-loop
-      await upload(f);
-    }
-    setTitle("");
-    setDepartment("");
-  };
-
   return (
-    <div className="ui-stack">
+    <div className="ui-stack" style={{ gap: "var(--space-6)" }}>
       <ToastContainer toasts={toasts} onDismiss={dismiss} />
 
       <header className="ui-page-head">
         <div>
           <h1 className="ui-page-head__title">Knowledge Vault</h1>
-          <p className="ui-page-head__sub">Securely ingest authorized documents into your knowledge workspace.</p>
+          <p className="ui-page-head__sub">
+            Secure multi-format document intake with verified source grounding, RBAC isolation, and instant semantic indexing.
+          </p>
         </div>
       </header>
 
-      <Card title="Upload secure documents" subtitle="Files are validated, parsed and indexed before they become searchable.">
-        {error && <div style={{ marginBottom: "var(--space-4)" }}><Alert kind="error">{error}</Alert></div>}
+      {/* Upload Zone Card */}
+      <Card
+        title="Ingest Documents"
+        subtitle="Supports PDF, DOC, DOCX, PPT, PPTX, TXT, MD, CSV, RTF, HTML, JSON, and XML."
+      >
+        {error && (
+          <div style={{ marginBottom: "var(--space-4)" }}>
+            <Alert kind="error">{error}</Alert>
+          </div>
+        )}
 
-        <UploadZone onFiles={onFiles} accept=".pdf,.docx,.pptx,.txt,.md" />
+        {/* Ingestion Parameters Toolbar */}
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+            gap: "var(--space-3)",
+            marginBottom: "var(--space-4)",
+            padding: "var(--space-3)",
+            background: "rgba(255, 255, 255, 0.03)",
+            borderRadius: "var(--radius-md)",
+            border: "1px solid var(--color-border)",
+          }}
+        >
+          <Select
+            label="Classification"
+            value={classification}
+            onChange={(e) => setClassification(e.target.value)}
+            options={CLASSIFICATIONS.map((c) => ({ value: c, label: c }))}
+            hint="Mandatory RBAC security tag"
+          />
+          <Input
+            label="Department (optional)"
+            value={department}
+            onChange={(e) => setDepartment(e.target.value)}
+            placeholder="e.g. Operations, IT, Finance"
+          />
+          <div style={{ display: "flex", flexDirection: "column", justifyContent: "center", paddingTop: "14px" }}>
+            <label
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "8px",
+                fontSize: "var(--font-size-sm)",
+                cursor: "pointer",
+                userSelect: "none",
+                fontWeight: 500,
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={autoUpload}
+                onChange={(e) => setAutoUpload(e.target.checked)}
+                style={{ accentColor: "var(--color-primary, #6366f1)", width: "16px", height: "16px" }}
+              />
+              <span>⚡ Upload immediately on select / drop</span>
+            </label>
+            <span style={{ fontSize: "11px", color: "var(--color-muted)", marginLeft: "24px" }}>
+              {autoUpload ? "Files ingest directly as soon as dropped" : "Stage files below before uploading"}
+            </span>
+          </div>
+        </div>
 
+        {/* Dropzone with wide accept types */}
+        <UploadZone
+          onFiles={onFiles}
+          accept=".pdf,.doc,.docx,.ppt,.pptx,.txt,.md,.csv,.rtf,.html,.htm,.json,.xml"
+        />
+
+        {/* Supported badges banner */}
+        <div
+          style={{
+            marginTop: "var(--space-3)",
+            display: "flex",
+            flexWrap: "wrap",
+            gap: "6px",
+            alignItems: "center",
+            fontSize: "12px",
+            color: "var(--color-muted)",
+          }}
+        >
+          <span style={{ fontWeight: 600 }}>Supported Formats:</span>
+          {["PDF", "DOC", "DOCX", "PPT", "PPTX", "TXT", "MD", "CSV", "RTF", "HTML", "JSON", "XML"].map((fmt) => (
+            <span
+              key={fmt}
+              style={{
+                background: "rgba(255, 255, 255, 0.06)",
+                border: "1px solid rgba(255, 255, 255, 0.1)",
+                padding: "2px 6px",
+                borderRadius: "4px",
+                fontFamily: "monospace",
+                fontSize: "11px",
+              }}
+            >
+              .{fmt.toLowerCase()}
+            </span>
+          ))}
+        </div>
+
+        {/* Pending Review Queue (when autoUpload is false or files staged) */}
         {pending.length > 0 && (
           <div style={{ marginTop: "var(--space-5)" }}>
-            <h2 style={{ fontSize: "var(--font-size-sm)", fontWeight: 600, margin: "0 0 var(--space-3)" }}>
-              Review before uploading ({pending.length})
-            </h2>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "var(--space-3)" }}>
+              <h2 style={{ fontSize: "var(--font-size-sm)", fontWeight: 600, margin: 0 }}>
+                Staged for Ingestion ({pending.length} file{pending.length > 1 ? "s" : ""})
+              </h2>
+              <div style={{ display: "flex", gap: "8px" }}>
+                <Button variant="ghost" size="sm" onClick={() => setPending([])} disabled={!!busyFile}>
+                  Discard All
+                </Button>
+                <Button variant="primary" size="sm" onClick={uploadAll} loading={!!busyFile}>
+                  {busyFile ? `Uploading ${busyFile}...` : `Upload All (${pending.length})`}
+                </Button>
+              </div>
+            </div>
 
             <div className="ui-table-wrap" style={{ marginBottom: "var(--space-4)" }}>
               <table className="ui-table ui-table--compact">
-                <thead><tr><th>File</th><th>Size</th><th>Type</th><th aria-label="Remove" /></tr></thead>
+                <thead>
+                  <tr>
+                    <th>File</th>
+                    <th>Size</th>
+                    <th>Classification</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
                 <tbody>
                   {pending.map((f, i) => (
                     <tr key={`${f.name}-${f.lastModified}-${i}`}>
-                      <td className="ui-table__title">{f.name}</td>
+                      <td className="ui-table__title">
+                        <span style={{ fontWeight: 600 }}>{f.name}</span>
+                      </td>
                       <td className="ui-muted">{fmtSize(f.size)}</td>
-                      <td className="ui-muted">{f.type || "—"}</td>
                       <td>
-                        <div className="ui-table__actions">
-                          <Button variant="ghost" size="sm" onClick={() => removePending(f)} disabled={busyFile === f.name}>Remove</Button>
+                        <ClassificationBadge classification={classification} />
+                      </td>
+                      <td>
+                        <div className="ui-table__actions" style={{ gap: "6px" }}>
+                          <Button
+                            variant="primary"
+                            size="sm"
+                            onClick={() => uploadSingle(f)}
+                            loading={busyFile === f.name}
+                            disabled={!!busyFile && busyFile !== f.name}
+                          >
+                            Upload Now
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => removePending(f)}
+                            disabled={busyFile === f.name}
+                          >
+                            Remove
+                          </Button>
                         </div>
                       </td>
                     </tr>
@@ -136,54 +351,133 @@ export default function KnowledgeVault() {
                 </tbody>
               </table>
             </div>
-
-            <div className="ui-grid ui-grid--3" style={{ marginBottom: "var(--space-4)" }}>
-              <Input label="Title (optional)" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Defaults to filename" />
-              <Select
-                label="Classification"
-                value={classification}
-                onChange={(e) => setClassification(e.target.value)}
-                options={CLASSIFICATIONS.map((c) => ({ value: c, label: c }))}
-                hint="Sets the default sensitivity for retrieval."
-              />
-              <Input label="Department (optional)" value={department} onChange={(e) => setDepartment(e.target.value)} placeholder="e.g. Finance" />
-            </div>
-
-            <Alert kind="info">
-              Files are processed according to your organization&apos;s configured storage and AI transfer policies. Classification is enforced server-side.
-            </Alert>
-
-            <div className="ui-row ui-row--end" style={{ marginTop: "var(--space-4)" }}>
-              <Button variant="ghost" onClick={() => setPending([])} disabled={!!busyFile}>Discard all</Button>
-              <Button variant="primary" onClick={uploadAll} loading={!!busyFile} disabled={!pending.length}>
-                {busyFile ? `Uploading ${busyFile}` : `Upload ${pending.length} file(s)`}
-              </Button>
-            </div>
           </div>
         )}
       </Card>
 
-      <Card title="Ingestion status" subtitle="Live pipeline state for this session">
-        {uploads.length === 0 && (
-          <p className="ui-muted" style={{ margin: 0, fontSize: "var(--font-size-sm)" }}>
-            No uploads in this session.
+      {/* Ingestion Status Pipeline Card */}
+      <Card
+        title="Live Ingestion Pipeline"
+        subtitle="Real-time multi-stage parser, chunker, and vector embedding status"
+      >
+        {uploads.length === 0 ? (
+          <p className="ui-muted" style={{ margin: 0, fontSize: "var(--font-size-sm)", padding: "var(--space-2) 0" }}>
+            No uploads in this active session. Upload documents above to view live parsing, OCR, and embedding pipelines.
           </p>
-        )}
-        {uploads.map((u) => (
-          <div key={u.jobId || u.documentId} style={{ padding: "var(--space-3) 0", borderBottom: "1px solid var(--color-border)" }}>
-            <div className="ui-row ui-row--between">
-              <div style={{ minWidth: 0 }}>
-                <strong style={{ fontSize: "var(--font-size-sm)" }}>{u.name}</strong>
-                {u.size && <span className="ui-small ui-muted" style={{ marginLeft: 8 }}>{fmtSize(u.size)}</span>}
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)" }}>
+            {uploads.map((u) => (
+              <div
+                key={u.jobId || u.documentId || u.name}
+                style={{
+                  padding: "var(--space-3)",
+                  background: "rgba(255, 255, 255, 0.02)",
+                  borderRadius: "var(--radius-md)",
+                  border: "1px solid var(--color-border)",
+                }}
+              >
+                <div className="ui-row ui-row--between" style={{ alignItems: "center", marginBottom: "var(--space-2)" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "10px", minWidth: 0, flexWrap: "wrap" }}>
+                    <strong style={{ fontSize: "var(--font-size-sm)" }}>{u.name}</strong>
+                    {u.size && <span className="ui-small ui-muted">{fmtSize(u.size)}</span>}
+                    {u.duplicate && (
+                      <span
+                        style={{
+                          fontSize: "11px",
+                          padding: "1px 6px",
+                          borderRadius: "4px",
+                          background: "rgba(59, 130, 246, 0.15)",
+                          color: "#93c5fd",
+                          border: "1px solid rgba(59, 130, 246, 0.3)",
+                        }}
+                      >
+                        Duplicate (Already indexed)
+                      </span>
+                    )}
+                    {u.time && <span className="ui-small ui-muted">{u.time}</span>}
+                  </div>
+                  <div className="ui-row" style={{ gap: "var(--space-2)" }}>
+                    {u.status === "FAILED" && u.jobId && (
+                      <Button variant="secondary" size="sm" onClick={() => retry(u.jobId)}>
+                        Retry
+                      </Button>
+                    )}
+                    {u.documentId && (
+                      <Link className="ui-btn ui-btn--secondary ui-btn--sm" to={`/documents/${u.documentId}`}>
+                        Open Details
+                      </Link>
+                    )}
+                    {u.documentId && u.status === "READY" && (
+                      <Link className="ui-btn ui-btn--primary ui-btn--sm" to={`/assistant?docId=${u.documentId}`}>
+                        Ask AI
+                      </Link>
+                    )}
+                  </div>
+                </div>
+                <IngestionStepper status={u.status} errorMessage={u.error} />
               </div>
-              <div className="ui-row" style={{ gap: "var(--space-2)" }}>
-                {u.status === "FAILED" && u.jobId && <Button variant="secondary" size="sm" onClick={() => retry(u.jobId)}>Retry</Button>}
-                {u.documentId && <Link className="ui-btn ui-btn--secondary ui-btn--sm" to={`/documents/${u.documentId}`}>Open</Link>}
-              </div>
-            </div>
-            <IngestionStepper status={u.status} errorMessage={u.error} />
+            ))}
           </div>
-        ))}
+        )}
+      </Card>
+
+      {/* Existing Vault Documents Card */}
+      <Card
+        title="Recently Indexed Knowledge"
+        subtitle="Documents currently authorized and available for grounded semantic retrieval"
+      >
+        {loadingDocs ? (
+          <p className="ui-muted" style={{ margin: 0, fontSize: "var(--font-size-sm)" }}>Loading knowledge vault...</p>
+        ) : recentDocs.length === 0 ? (
+          <p className="ui-muted" style={{ margin: 0, fontSize: "var(--font-size-sm)" }}>
+            No documents found in your authorized vault yet. Upload documents above to begin.
+          </p>
+        ) : (
+          <div className="ui-table-wrap">
+            <table className="ui-table ui-table--compact">
+              <thead>
+                <tr>
+                  <th>Title</th>
+                  <th>Classification</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {recentDocs.map((d) => (
+                  <tr key={d.id}>
+                    <td className="ui-table__title">
+                      <Link to={`/documents/${d.id}`} style={{ color: "var(--color-text)", fontWeight: 600 }}>
+                        {d.title || d.sourceFilename}
+                      </Link>
+                    </td>
+                    <td>
+                      <ClassificationBadge classification={d.classification} />
+                    </td>
+                    <td>
+                      <StatusBadge status="READY" />
+                    </td>
+                    <td>
+                      <div className="ui-table__actions" style={{ gap: "6px" }}>
+                        <Link className="ui-btn ui-btn--ghost ui-btn--sm" to={`/documents/${d.id}/view`}>
+                          View
+                        </Link>
+                        <Link className="ui-btn ui-btn--secondary ui-btn--sm" to={`/assistant?docId=${d.id}`}>
+                          Query
+                        </Link>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+        <div style={{ marginTop: "var(--space-3)", textAlign: "right" }}>
+          <Link className="ui-btn ui-btn--ghost ui-btn--sm" to="/documents">
+            View All Documents →
+          </Link>
+        </div>
       </Card>
     </div>
   );

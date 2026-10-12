@@ -6,11 +6,13 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import ai.sachet.ingest.DocParser;
 import ai.sachet.ingest.DocxParser;
 import ai.sachet.ingest.DocumentParser;
 import ai.sachet.ingest.ParsedDocument;
 import ai.sachet.ingest.ParserRegistry;
 import ai.sachet.ingest.PdfParser;
+import ai.sachet.ingest.PptParser;
 import ai.sachet.ingest.PptxParser;
 import ai.sachet.ingest.TextParser;
 import java.io.ByteArrayOutputStream;
@@ -32,13 +34,13 @@ import org.apache.poi.xwpf.usermodel.XWPFRun;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-/** Parser unit tests with generated fixtures (PDF/DOCX/PPTX/TXT/MD + blank scan). */
+/** Parser unit tests with generated fixtures (PDF/DOCX/PPTX/TXT/MD/DOC/PPT/CSV/HTML + blank scan). */
 class ParserUnitTest {
 
   @TempDir Path tmp;
 
   private final ParserRegistry registry = new ParserRegistry(
-      List.of(new PdfParser(), new DocxParser(), new PptxParser(), new TextParser()));
+      List.of(new PdfParser(), new DocParser(), new DocxParser(), new PptParser(), new PptxParser(), new TextParser()));
 
   private Path write(String name, byte[] bytes) throws Exception {
     Path p = tmp.resolve(name);
@@ -142,6 +144,30 @@ class ParserUnitTest {
         .parse(write("n.md", md.getBytes(StandardCharsets.UTF_8)));
     assertEquals(1, parsed.pages().get(0).pageNumber());
     assertTrue(parsed.pages().get(0).text().contains("Some body text"));
+  }
+
+  @Test
+  void csvAndHtmlParsing() throws Exception {
+    String csv = "id,name,role\n1,alpha,commander\n";
+    ParsedDocument parsedCsv = registry.resolve("table.csv")
+        .parse(write("table.csv", csv.getBytes(StandardCharsets.UTF_8)));
+    assertEquals(1, parsedCsv.pages().get(0).pageNumber());
+    assertTrue(parsedCsv.pages().get(0).text().contains("commander"));
+
+    String html = "<html><body><h1>Policy Document</h1><p>Important guidelines here.</p></body></html>";
+    ParsedDocument parsedHtml = registry.resolve("index.html")
+        .parse(write("index.html", html.getBytes(StandardCharsets.UTF_8)));
+    assertTrue(parsedHtml.pages().get(0).text().contains("Policy Document"));
+    assertTrue(parsedHtml.pages().get(0).text().contains("Important guidelines here."));
+    assertFalse(parsedHtml.pages().get(0).text().contains("<p>"));
+  }
+
+  @Test
+  void registryResolvesAllFormats() {
+    assertTrue(registry.resolve("test.doc") instanceof DocParser);
+    assertTrue(registry.resolve("test.ppt") instanceof PptParser);
+    assertTrue(registry.resolve("test.csv") instanceof TextParser);
+    assertTrue(registry.resolve("test.html") instanceof TextParser);
   }
 
   @Test

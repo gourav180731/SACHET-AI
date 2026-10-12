@@ -17,7 +17,9 @@ import org.springframework.stereotype.Service;
 @Service
 public class FileValidationService {
 
-  private static final Set<String> ALLOWED = Set.of("pdf", "docx", "pptx", "txt", "md");
+  private static final Set<String> ALLOWED = Set.of(
+      "pdf", "doc", "docx", "ppt", "pptx", "txt", "md", "csv", "rtf", "html", "htm", "json", "xml"
+  );
   private static final long MIN_BYTES = 1;
 
   private final SachetProperties props;
@@ -33,7 +35,7 @@ public class FileValidationService {
     String ext = PdfParser.extensionOf(originalName);
     if (!ALLOWED.contains(ext)) {
       throw ValidationException.failed(
-          "Unsupported file type. Allowed: pdf, docx, pptx, txt, md.");
+          "Unsupported file type. Allowed: pdf, doc, docx, ppt, pptx, txt, md, csv, rtf, html, json, xml.");
     }
     long size;
     try {
@@ -70,7 +72,13 @@ public class FileValidationService {
       case "pdf" -> startsWith(head, "%PDF-");
       case "docx", "pptx" -> head.length >= 4 && head[0] == 0x50 && head[1] == 0x4B
           && head[2] == 0x03 && head[3] == 0x04; // ZIP container; POI validates OOXML async
-      case "txt", "md" -> looksLikeText(blob);
+      case "doc", "ppt" -> head.length >= 4
+          && (head[0] & 0xFF) == 0xD0
+          && (head[1] & 0xFF) == 0xCF
+          && (head[2] & 0xFF) == 0x11
+          && (head[3] & 0xFF) == 0xE0; // OLE2 Compound Document header
+      case "rtf" -> startsWith(head, "{\\rtf") || looksLikeText(blob);
+      case "txt", "md", "csv", "html", "htm", "json", "xml" -> looksLikeText(blob);
       default -> false;
     };
   }
@@ -100,8 +108,9 @@ public class FileValidationService {
       return false;
     }
     String s = new String(sample, StandardCharsets.UTF_8);
-    if (s.contains("�")) {
-      return false; // undecodable bytes: almost certainly binary
+    if (s.contains("")) {
+      // Check if it's readable under ISO-8859-1 or ASCII before rejecting
+      s = new String(sample, StandardCharsets.ISO_8859_1);
     }
     int printable = 0;
     for (int i = 0; i < s.length(); i++) {
@@ -110,7 +119,7 @@ public class FileValidationService {
         printable++;
       }
     }
-    return (double) printable / s.length() > 0.90;
+    return (double) printable / s.length() > 0.85;
   }
 
   static String sha256(Path blob) {
@@ -130,8 +139,15 @@ public class FileValidationService {
   private static String mimeFor(String ext) {
     return switch (ext) {
       case "pdf" -> "application/pdf";
+      case "doc" -> "application/msword";
       case "docx" -> "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+      case "ppt" -> "application/vnd.ms-powerpoint";
       case "pptx" -> "application/vnd.openxmlformats-officedocument.presentationml.presentation";
+      case "csv" -> "text/csv";
+      case "rtf" -> "application/rtf";
+      case "html", "htm" -> "text/html";
+      case "json" -> "application/json";
+      case "xml" -> "application/xml";
       case "md" -> "text/markdown";
       default -> "text/plain";
     };
