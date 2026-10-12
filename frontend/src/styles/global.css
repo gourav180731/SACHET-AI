@@ -36,11 +36,11 @@ img, svg { max-width: 100%; }
 .kv dt:last-of-type, .kv dd:last-of-type { border-bottom: none; }
 
 /* Security notice panels */
-.security-panel { font-size: var(--font-size-sm); color: var(--color-text-secondary); border: 1px solid var(--color-border); border-radius: var(--radius-lg); padding: var(--space-4); background: var(--color-bg); }
+.security-panel { font-size: var(--font-size-sm); color: var(--color-text-secondary); border: 1px solid var(--color-border); border-radius: var(--radius-lg); padding: var(--space-4); background: var(--color-surface); backdrop-filter: blur(12px); }
 
 /* Legacy alias kept for existing markup */
-.security-warning { border: 1px solid var(--color-warning-200); background: var(--color-warning-50); color: var(--color-warning-800); border-radius: var(--radius-md); padding: var(--space-3); font-size: var(--font-size-sm); }
-.insufficient { border: 1px solid var(--color-border-strong); background: var(--color-bg); border-radius: var(--radius-md); padding: var(--space-3); color: var(--color-text-secondary); font-size: var(--font-size-sm); }
+.security-warning { border: 1px solid rgba(245, 158, 11, 0.35); background: rgba(245, 158, 11, 0.12); color: #fbbf24; border-radius: var(--radius-md); padding: var(--space-3); font-size: var(--font-size-sm); }
+.insufficient { border: 1px solid rgba(148, 163, 184, 0.35); background: rgba(15, 23, 42, 0.6); border-radius: var(--radius-md); padding: var(--space-3); color: #cbd5e1; font-size: var(--font-size-sm); }
 
 /* Modal legacy classes */
 .modal-backdrop { position: fixed; inset: 0; background: rgba(15, 23, 42, 0.55); display: grid; place-items: center; z-index: 500; padding: var(--space-4); overflow-y: auto; }

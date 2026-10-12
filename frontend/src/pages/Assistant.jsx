@@ -820,7 +820,7 @@ export default function Assistant() {
   const currentLangObj = REGIONAL_LANGUAGES.find((l) => l.code === language) || REGIONAL_LANGUAGES[0];
 
   return (
-    <div className="assistant flex h-[calc(100vh-64px)] overflow-hidden bg-slate-100 dark:bg-zinc-950">
+    <div className="assistant flex h-[calc(100vh-64px)] overflow-hidden bg-transparent">
       {/* Sidebar history */}
       <aside className={`chat-sidebar ${sidebarOpen ? "chat-sidebar--open" : ""}`} aria-label="Chat history">
         <div className="chat-sidebar__head flex items-center justify-between p-3 border-b border-slate-200 dark:border-zinc-800">
@@ -869,7 +869,7 @@ export default function Assistant() {
       </aside>
 
       {/* Main chat surface */}
-      <div className="chat-main flex-1 flex flex-col min-w-0 bg-white dark:bg-zinc-900 rounded-2xl m-2 sm:m-3 border border-slate-200 dark:border-zinc-800 shadow-md overflow-hidden relative">
+      <div className="chat-main flex-1 flex flex-col min-w-0 bg-zinc-950/75 backdrop-blur-xl rounded-2xl m-2 sm:m-3 border border-sky-500/25 shadow-2xl overflow-hidden relative">
         {voiceMode ? (
           <div className="flex-1 flex flex-col min-h-0 bg-gradient-to-b from-slate-950 via-zinc-950 to-black text-white relative overflow-y-auto animate-fadeIn">
             {/* Voice Mode Header */}

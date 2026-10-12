@@ -60,44 +60,44 @@
   --color-success-800: #166534;
   --color-success-900: #14532d;
 
-  /* Neutral Colors */
+  /* Neutral Colors - Dark Obsidian Cyber Palette */
   --color-white: #ffffff;
   --color-black: #000000;
-  --color-bg: #f6f7f9;
-  --color-bg-elevated: #ffffff;
-  --color-surface: #ffffff;
-  --color-surface-hover: #f9fafb;
-  --color-border: #e5e7eb;
-  --color-border-strong: #d1d5db;
-  --color-border-focus: #1d4ed8;
-  --color-text: #111827;
-  --color-text-primary: #111827;
-  --color-text-secondary: #4b5563;
-  --color-text-muted: #6b7280;
-  --color-text-inverse: #ffffff;
-  --color-text-link: #1d4ed8;
+  --color-bg: #000000;
+  --color-bg-elevated: rgba(10, 16, 28, 0.85);
+  --color-surface: rgba(11, 17, 30, 0.78);
+  --color-surface-hover: rgba(18, 28, 48, 0.9);
+  --color-border: rgba(66, 138, 248, 0.22);
+  --color-border-strong: rgba(66, 138, 248, 0.38);
+  --color-border-focus: #38bdf8;
+  --color-text: #f8fafc;
+  --color-text-primary: #f8fafc;
+  --color-text-secondary: #94a3b8;
+  --color-text-muted: #64748b;
+  --color-text-inverse: #020617;
+  --color-text-link: #38bdf8;
 
   /* Classification Colors */
-  --color-classification-public: #3b82f6;
-  --color-classification-public-bg: #eff6ff;
-  --color-classification-internal: #14532d;
-  --color-classification-internal-bg: #f0fdf4;
-  --color-classification-restricted: #b45309;
-  --color-classification-restricted-bg: #fef3c7;
-  --color-classification-confidential: #7c3aed;
-  --color-classification-confidential-bg: #f5f3ff;
-  --color-classification-secret: #b91c1c;
-  --color-classification-secret-bg: #fef2f2;
+  --color-classification-public: #38bdf8;
+  --color-classification-public-bg: rgba(56, 189, 248, 0.14);
+  --color-classification-internal: #4ade80;
+  --color-classification-internal-bg: rgba(74, 222, 128, 0.14);
+  --color-classification-restricted: #fbbf24;
+  --color-classification-restricted-bg: rgba(251, 191, 36, 0.14);
+  --color-classification-confidential: #c084fc;
+  --color-classification-confidential-bg: rgba(192, 132, 252, 0.14);
+  --color-classification-secret: #f87171;
+  --color-classification-secret-bg: rgba(248, 113, 113, 0.14);
 
   /* Status Colors */
-  --color-status-ready: #14532d;
-  --color-status-ready-bg: #f0fdf4;
-  --color-status-processing: #b45309;
-  --color-status-processing-bg: #fef3c7;
-  --color-status-failed: #b91c1c;
-  --color-status-failed-bg: #fef2f2;
-  --color-status-queued: #6b7280;
-  --color-status-queued-bg: #f3f4f6;
+  --color-status-ready: #4ade80;
+  --color-status-ready-bg: rgba(74, 222, 128, 0.14);
+  --color-status-processing: #fbbf24;
+  --color-status-processing-bg: rgba(251, 191, 36, 0.14);
+  --color-status-failed: #f87171;
+  --color-status-failed-bg: rgba(248, 113, 113, 0.14);
+  --color-status-queued: #94a3b8;
+  --color-status-queued-bg: rgba(148, 163, 184, 0.14);
 
   /* Spacing Scale */
   --space-0: 0;

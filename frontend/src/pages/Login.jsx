@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { Alert } from "../components/UI";
+import CyberPattern from "../components/CyberPattern";
 
 const ShieldEmblem = () => (
   <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" className="w-8 h-8 text-emerald-500" aria-hidden="true">
@@ -77,11 +78,11 @@ export default function Login() {
   };
 
   return (
-    <div className="auth-wrapper font-sans selection:bg-blue-500 selection:text-white">
+    <div className="auth-wrapper font-sans selection:bg-blue-500 selection:text-white bg-black">
+      <CyberPattern fixed />
       {/* Background glow and subtle ambient pattern */}
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_80%_at_50%_-20%,rgba(45,121,243,0.12),rgba(255,255,255,0))] dark:bg-[radial-gradient(ellipse_80%_80%_at_50%_-20%,rgba(16,185,129,0.15),rgba(0,0,0,0))] pointer-events-none" />
-      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-blue-500/10 dark:bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
-      <div className="absolute bottom-10 right-10 w-72 h-72 bg-emerald-500/10 dark:bg-blue-600/10 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-blue-500/15 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute bottom-10 right-10 w-72 h-72 bg-cyan-500/15 rounded-full blur-3xl pointer-events-none" />
 
       {/* Brand logo & header on top of form */}
       <div className="text-center mb-6 z-10 animate-fadeIn">
