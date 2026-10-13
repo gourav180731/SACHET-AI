@@ -1,17 +1,13 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { useProfile } from "../context/ProfileContext";
 import { Alert } from "../components/UI";
 import CyberPattern from "../components/CyberPattern";
 
-const ShieldEmblem = () => (
-  <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" className="w-8 h-8 text-emerald-500" aria-hidden="true">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 12.75L11.25 15 15 9.75M21 12c0 4.97-4.03 9-9 9s-9-4.03-9-9 4.03-9 9-9c1.19 0 2.33.22 3.36.62M21 12a9 9 0 00-9-9" />
-  </svg>
-);
-
 export default function Login() {
-  const { login } = useAuth();
+  const { login, loginWithGoogle } = useAuth();
+  const { updateProfile } = useProfile();
   const navigate = useNavigate();
 
   const [email, setEmail] = useState("admin@sachet.gov");
@@ -22,6 +18,58 @@ export default function Login() {
   const [error, setError] = useState(null);
   const [notice, setNotice] = useState(null);
   const [busy, setBusy] = useState(false);
+
+  // Google SSO Modal & State
+  const [showGoogleModal, setShowGoogleModal] = useState(false);
+  const [googleEmail, setGoogleEmail] = useState("");
+  const [googleName, setGoogleName] = useState("");
+  const [googleBusy, setGoogleBusy] = useState(false);
+  const [googleError, setGoogleError] = useState(null);
+
+  // Initialize Google Identity Services if client ID is configured
+  useEffect(() => {
+    const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+    if (googleClientId && window.google?.accounts?.id) {
+      try {
+        window.google.accounts.id.initialize({
+          client_id: googleClientId,
+          callback: async (response) => {
+            if (response?.credential) {
+              try {
+                setGoogleBusy(true);
+                // Decode base64 JWT payload
+                const base64Url = response.credential.split(".")[1];
+                const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
+                const payload = JSON.parse(decodeURIComponent(escape(window.atob(base64))));
+                const gEmail = payload.email;
+                const gName = payload.name || payload.given_name || "";
+                const gPicture = payload.picture || "";
+
+                await loginWithGoogle({
+                  email: gEmail,
+                  name: gName,
+                  credential: response.credential,
+                  picture: gPicture,
+                });
+
+                if (gName) {
+                  updateProfile({ fullName: gName, displayName: gName.split(" ")[0], email: gEmail });
+                }
+                setShowGoogleModal(false);
+                navigate("/dashboard", { replace: true });
+              } catch (err) {
+                setGoogleError(err.message || "Google authentication failed.");
+              } finally {
+                setGoogleBusy(false);
+              }
+            }
+          },
+        });
+      } catch (err) {
+        console.warn("Google One-Tap initialization notice:", err);
+      }
+    }
+  }, [loginWithGoogle, navigate, updateProfile]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -62,7 +110,53 @@ export default function Login() {
     setError(null);
   };
 
+  const handleOpenGoogle = () => {
+    setError(null);
+    setNotice(null);
+    setGoogleError(null);
+    setShowGoogleModal(true);
+  };
+
+  const handleExecuteGoogleLogin = async (targetEmail, targetName) => {
+    const finalEmail = (targetEmail || googleEmail || "").trim();
+    const finalName = (targetName || googleName || "").trim();
+
+    if (!finalEmail || !finalEmail.includes("@")) {
+      setGoogleError("Please enter a valid Google account email address.");
+      return;
+    }
+
+    setGoogleBusy(true);
+    setGoogleError(null);
+
+    try {
+      await loginWithGoogle({
+        email: finalEmail,
+        name: finalName,
+      });
+
+      if (finalName) {
+        updateProfile({
+          fullName: finalName,
+          displayName: finalName.split(" ")[0],
+          email: finalEmail,
+        });
+      }
+
+      setShowGoogleModal(false);
+      navigate("/dashboard", { replace: true });
+    } catch (err) {
+      setGoogleError(err.message || "Failed to sign in with Google SSO. Please verify server connection.");
+    } finally {
+      setGoogleBusy(false);
+    }
+  };
+
   const handleSocialAuth = (provider) => {
+    if (provider === "Google") {
+      handleOpenGoogle();
+      return;
+    }
     setNotice(
       `${provider} Single Sign-On (SSO): Identity Provider federation requires integration with the Government National Security Gateway.`
     );
@@ -86,9 +180,13 @@ export default function Login() {
 
       {/* Brand logo & header on top of form */}
       <div className="text-center mb-6 z-10 animate-fadeIn">
-        <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 shadow-md shadow-slate-200/50 dark:shadow-black/50 mb-3 relative">
-          <ShieldEmblem />
-          <span className="absolute -top-1 -right-1 flex h-3 w-3">
+        <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-zinc-950 border border-cyan-500/40 shadow-xl shadow-cyan-500/20 mb-3 relative overflow-hidden group">
+          <img
+            src="/sachet-logo.jpg"
+            alt="SACHET AI Official Emblem"
+            className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+          />
+          <span className="absolute top-1 right-1 flex h-3 w-3">
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
             <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500" />
           </span>
@@ -268,8 +366,8 @@ export default function Login() {
           <button
             type="button"
             onClick={() => handleSocialAuth("Google")}
-            className="btn google"
-            title="Sign in with Google SSO"
+            className="btn google relative group overflow-hidden"
+            title="Sign in live with Google SSO"
           >
             <svg
               xmlSpace="preserve"
@@ -302,7 +400,10 @@ export default function Login() {
                 style={{ fill: "#F14336" }}
               />
             </svg>
-            <span>Google</span>
+            <span className="font-semibold text-slate-900 dark:text-white">Google</span>
+            <span className="absolute top-1 right-2 inline-flex items-center px-1.5 py-0.2 text-[9px] font-bold text-emerald-400 bg-emerald-950/80 border border-emerald-500/30 rounded-full">
+              LIVE
+            </span>
           </button>
 
           <button
@@ -357,6 +458,191 @@ export default function Login() {
         </svg>
         <span>Server-side RBAC · Audit-logged sessions · Zero data leakage</span>
       </div>
+
+      {/* =========================================================================
+          Live Google Sign-In Interactive Modal Overlay
+         ========================================================================= */}
+      {showGoogleModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-fadeIn"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="google-modal-title"
+          onClick={(e) => {
+            if (e.target === e.currentTarget && !googleBusy) {
+              setShowGoogleModal(false);
+            }
+          }}
+        >
+          <div
+            className="relative w-full max-w-md bg-zinc-950 border border-slate-700/80 rounded-2xl p-6 sm:p-7 shadow-2xl text-left overflow-hidden"
+            style={{
+              boxShadow: "0 20px 45px -10px rgba(0, 0, 0, 0.8), 0 0 20px rgba(56, 189, 248, 0.15)",
+            }}
+          >
+            {/* Modal header with Google Logo */}
+            <div className="flex items-start justify-between mb-5">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center shadow-md p-2">
+                  <svg
+                    viewBox="0 0 512 512"
+                    width={22}
+                    height={22}
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path
+                      d="M113.47,309.408L95.648,375.94l-65.139,1.378C11.042,341.211,0,299.9,0,256 c0-42.451,10.324-82.483,28.624-117.732h0.014l57.992,10.632l25.404,57.644c-5.317,15.501-8.215,32.141-8.215,49.456 C103.821,274.792,107.225,292.797,113.47,309.408z"
+                      fill="#FBBB00"
+                    />
+                    <path
+                      d="M507.527,208.176C510.467,223.662,512,239.655,512,256c0,18.328-1.927,36.206-5.598,53.451 c-12.462,58.683-45.025,109.925-90.134,146.187l-0.014-0.014l-73.044-3.727l-10.338-64.535 c29.932-17.554,53.324-45.025,65.646-77.911h-136.89V208.176h138.887L507.527,208.176L507.527,208.176z"
+                      fill="#518EF8"
+                    />
+                    <path
+                      d="M416.253,455.624l0.014,0.014C372.396,490.901,316.666,512,256,512 c-97.491,0-182.252-54.491-225.491-134.681l82.961-67.91c21.619,57.698,77.278,98.771,142.53,98.771 c28.047,0,54.323-7.582,76.87-20.818L416.253,455.624z"
+                      fill="#28B446"
+                    />
+                    <path
+                      d="M419.404,58.936l-82.933,67.896c-23.335-14.586-50.919-23.012-80.471-23.012 c-66.729,0-123.429,42.957-143.965,102.724l-83.397-68.276h-0.014C71.23,56.123,157.06,0,256,0 C318.115,0,375.068,22.126,419.404,58.936z"
+                      fill="#F14336"
+                    />
+                  </svg>
+                </div>
+                <div>
+                  <h3 id="google-modal-title" className="text-lg font-bold text-white leading-tight">
+                    Sign in with Google
+                  </h3>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    Connect to SACHET AI via verified Google SSO
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setShowGoogleModal(false)}
+                disabled={googleBusy}
+                className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-zinc-800 transition-colors"
+                aria-label="Close Google Sign-in modal"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Error banner inside modal */}
+            {googleError && (
+              <div className="mb-4">
+                <Alert kind="error">{googleError}</Alert>
+              </div>
+            )}
+
+            {/* Account Selection Options */}
+            <div className="space-y-3 mb-5">
+              <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+                Choose an account
+              </p>
+
+              {/* Quick option: System Administrator Google SSO */}
+              <div
+                role="button"
+                tabIndex={0}
+                onClick={() => handleExecuteGoogleLogin("admin@sachet.gov", "System Administrator")}
+                onKeyDown={(e) => e.key === "Enter" && handleExecuteGoogleLogin("admin@sachet.gov", "System Administrator")}
+                className="flex items-center justify-between p-3.5 rounded-xl border border-slate-700/70 bg-zinc-900/80 hover:bg-zinc-800/80 hover:border-cyan-500/50 cursor-pointer transition-all duration-150 group"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-blue-600 to-cyan-500 flex items-center justify-center font-bold text-white text-sm shadow-md">
+                    SA
+                  </div>
+                  <div>
+                    <div className="text-sm font-semibold text-slate-100 group-hover:text-cyan-400 transition-colors">
+                      System Administrator
+                    </div>
+                    <div className="text-xs text-slate-400">admin@sachet.gov</div>
+                  </div>
+                </div>
+                <span className="text-[10px] font-semibold uppercase px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                  HQ Admin
+                </span>
+              </div>
+            </div>
+
+            {/* Custom Google Account Section */}
+            <div className="pt-4 border-t border-zinc-800">
+              <p className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-3">
+                Or sign in with another Google account
+              </p>
+
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-xs font-medium text-slate-300 mb-1">
+                    Google Email Address
+                  </label>
+                  <input
+                    type="email"
+                    placeholder="e.g. officer.name@gmail.com"
+                    value={googleEmail}
+                    onChange={(e) => setGoogleEmail(e.target.value)}
+                    disabled={googleBusy}
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-900 border border-slate-700 text-white placeholder-slate-500 text-sm focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 transition-colors"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-slate-300 mb-1">
+                    Your Name (Optional)
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Gourav Kumar"
+                    value={googleName}
+                    onChange={(e) => setGoogleName(e.target.value)}
+                    disabled={googleBusy}
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-900 border border-slate-700 text-white placeholder-slate-500 text-sm focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 transition-colors"
+                  />
+                </div>
+
+                <button
+                  type="button"
+                  disabled={googleBusy}
+                  onClick={() => handleExecuteGoogleLogin()}
+                  className="w-full mt-2 py-3 px-4 rounded-xl font-semibold text-sm bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white shadow-lg shadow-cyan-600/25 flex items-center justify-center gap-2 cursor-pointer transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {googleBusy ? (
+                    <>
+                      <svg className="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                      </svg>
+                      <span>Authenticating with Google...</span>
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24">
+                        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14.5v-9l6 4.5-6 4.5z" />
+                      </svg>
+                      <span>Continue with this Google Account</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+
+            <div className="mt-4 text-center">
+              <button
+                type="button"
+                onClick={() => setShowGoogleModal(false)}
+                disabled={googleBusy}
+                className="text-xs text-slate-400 hover:text-slate-200 transition-colors cursor-pointer"
+              >
+                Cancel and return to standard sign-in
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

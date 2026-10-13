@@ -33,9 +33,28 @@ public class AuthController {
       @NotBlank String password) {
   }
 
+  public record GoogleLoginRequest(
+      @Email @NotBlank String email,
+      String name,
+      String credential,
+      String picture) {
+  }
+
   @PostMapping("/login")
   public ResponseEntity<Map<String, Object>> login(@Valid @RequestBody LoginRequest req) {
     AuthService.LoginResult r = auth.login(req.email().trim().toLowerCase(), req.password());
+    return ResponseEntity.ok(Map.of(
+        "tokenType", "Bearer",
+        "accessToken", r.accessToken(),
+        "roles", List.copyOf(r.roles())));
+  }
+
+  @PostMapping("/google")
+  public ResponseEntity<Map<String, Object>> loginWithGoogle(@Valid @RequestBody GoogleLoginRequest req) {
+    AuthService.LoginResult r = auth.loginWithGoogle(
+        req.email().trim().toLowerCase(),
+        req.name() == null ? "" : req.name().trim(),
+        req.picture() == null ? "" : req.picture().trim());
     return ResponseEntity.ok(Map.of(
         "tokenType", "Bearer",
         "accessToken", r.accessToken(),

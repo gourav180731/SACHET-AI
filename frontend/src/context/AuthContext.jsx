@@ -44,6 +44,18 @@ export function AuthProvider({ children }) {
     return res;
   }, []);
 
+  const loginWithGoogle = useCallback(async (payload) => {
+    const res = await authApi.googleLogin(payload);
+    const claims = parseJwt(res.accessToken);
+    const userId = claims.sub || payload.email || "google-user";
+    sessionStorage.setItem("sachet.token", res.accessToken);
+    sessionStorage.setItem("sachet.roles", JSON.stringify(res.roles || []));
+    sessionStorage.setItem("sachet.user", userId);
+    setToken(res.accessToken);
+    setAuth({ token: res.accessToken, roles: res.roles || [], userId });
+    return res;
+  }, []);
+
   const logout = useCallback(() => {
     sessionStorage.removeItem("sachet.token");
     sessionStorage.removeItem("sachet.roles");
@@ -53,7 +65,7 @@ export function AuthProvider({ children }) {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ auth, login, logout }}>
+    <AuthContext.Provider value={{ auth, login, loginWithGoogle, logout }}>
       {children}
     </AuthContext.Provider>
   );

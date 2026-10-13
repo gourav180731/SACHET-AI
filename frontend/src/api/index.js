@@ -3,6 +3,8 @@ import { apiFetch, fetchWithStream } from "./client";
 export const authApi = {
   login: (email, password) =>
     apiFetch("/auth/login", { method: "POST", body: { email, password } }),
+  googleLogin: (payload) =>
+    apiFetch("/auth/google", { method: "POST", body: payload }),
 };
 
 export const documentsApi = {

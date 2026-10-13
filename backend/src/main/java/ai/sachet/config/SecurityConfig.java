@@ -77,7 +77,7 @@ public class SecurityConfig {
         .authorizeHttpRequests(a -> a
             .dispatcherTypeMatchers(DispatcherType.ASYNC).permitAll()
             .requestMatchers(HttpMethod.GET, p + "/health", p + "/ready").permitAll()
-            .requestMatchers(HttpMethod.POST, p + "/auth/login").permitAll()
+            .requestMatchers(HttpMethod.POST, p + "/auth/login", p + "/auth/google").permitAll()
             .requestMatchers("/error").permitAll()
             .anyRequest().authenticated())
         .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);

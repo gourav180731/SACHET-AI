@@ -99,7 +99,9 @@ export default function Layout({ children }) {
 
       <nav className={`sidebar ${navOpen ? "sidebar--open" : ""}`} aria-label="Primary">
         <div className="sidebar__brand">
-          <span className="sidebar__logo" aria-hidden="true">{SHIELD}</span>
+          <span className="sidebar__logo" aria-hidden="true" style={{ overflow: "hidden", padding: 0 }}>
+            <img src="/sachet-logo.jpg" alt="SACHET AI" style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "inherit" }} />
+          </span>
           <span>
             <span className="sidebar__name">SACHET AI</span>
             <span className="sidebar__tagline">Security-first Knowledge Intelligence</span>

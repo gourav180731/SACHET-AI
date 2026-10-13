@@ -108,4 +108,38 @@ class AuthApiTest {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.status").value("pong"));
   }
+
+  @Test
+  void googleLoginOkForNewUser() throws Exception {
+    mvc.perform(post("/api/v1/auth/google")
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(mapper.writeValueAsString(Map.of(
+                "email", "newuser@gmail.com",
+                "name", "New Google User"))))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.tokenType").value("Bearer"))
+        .andExpect(jsonPath("$.accessToken").exists())
+        .andExpect(jsonPath("$.roles[0]").value("USER"));
+  }
+
+  @Test
+  void googleLoginOkForExistingUser() throws Exception {
+    mvc.perform(post("/api/v1/auth/google")
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(mapper.writeValueAsString(Map.of(
+                "email", "admin@example.gov",
+                "name", "System Administrator"))))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.tokenType").value("Bearer"))
+        .andExpect(jsonPath("$.accessToken").exists())
+        .andExpect(jsonPath("$.roles[0]").value("ADMIN"));
+  }
+
+  @Test
+  void googleLoginInvalidEmailFails() throws Exception {
+    mvc.perform(post("/api/v1/auth/google")
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(mapper.writeValueAsString(Map.of("email", "notanemail"))))
+        .andExpect(status().isBadRequest());
+  }
 }
