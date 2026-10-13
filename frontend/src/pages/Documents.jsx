@@ -6,11 +6,16 @@ import {
   Skeleton, Pagination, Button, ConfirmDialog, useToasts, ToastContainer, Tooltip,
 } from "../components/UI";
 
+import { useAuth } from "../context/AuthContext";
+import { useProfile } from "../context/ProfileContext";
+
 const PAGE_SIZE = 20;
 
 const TrashIcon = <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" /></svg>;
 
 export default function Documents() {
+  const { auth } = useAuth();
+  const { getDisplayName } = useProfile();
   const [page, setPage] = useState(0);
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
@@ -100,14 +105,22 @@ export default function Documents() {
                     <tr key={d.id}>
                       <td>
                         <Link className="ui-table__title" to={`/documents/${d.id}`}>{d.title || d.sourceFilename}</Link>
-                        <div className="ui-table__meta ui-truncate" style={{ maxWidth: 280 }}>{d.sourceFilename}</div>
+                        <div className="ui-table__meta ui-truncate" style={{ maxWidth: 300, color: "#94a3b8", fontSize: "12px", marginTop: "2px" }}>
+                          {d.sourceFilename}
+                        </div>
                       </td>
                       <td><ClassificationBadge value={d.classification} size="sm" /></td>
-                      <td className="ui-small ui-muted">{d.ownerId || "—"}</td>
-                      <td className="ui-mono">{d.version ?? "—"}</td>
+                      <td className="ui-small" style={{ color: "#cbd5e1" }}>
+                        {d.ownerId === auth?.userId ? (
+                          <span style={{ color: "#38bdf8", fontWeight: 600 }}>{getDisplayName()} (You)</span>
+                        ) : d.ownerId ? (
+                          <span>Officer ({d.ownerId.slice(0, 8)})</span>
+                        ) : "—"}
+                      </td>
+                      <td className="ui-mono" style={{ color: "#cbd5e1" }}>{d.version ?? "—"}</td>
                       <td><StatusBadge status={d.status} size="sm" /></td>
-                      <td className="ui-small ui-muted">{d.language || "—"}</td>
-                      <td className="ui-small ui-muted">{d.createdAt ? new Date(d.createdAt).toLocaleDateString() : "—"}</td>
+                      <td className="ui-small" style={{ color: "#94a3b8" }}>{d.language || "—"}</td>
+                      <td className="ui-small" style={{ color: "#94a3b8" }}>{d.createdAt ? new Date(d.createdAt).toLocaleDateString() : "—"}</td>
                       <td>
                         <div className="ui-table__actions">
                           <Tooltip content="Open document">

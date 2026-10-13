@@ -246,7 +246,7 @@ export default function KnowledgeVault() {
               />
               <span>⚡ Upload immediately on select / drop</span>
             </label>
-            <span style={{ fontSize: "11px", color: "var(--color-muted)", marginLeft: "24px" }}>
+            <span style={{ fontSize: "12px", color: "var(--color-text-muted)", marginLeft: "24px" }}>
               {autoUpload ? "Files ingest directly as soon as dropped" : "Stage files below before uploading"}
             </span>
           </div>
@@ -267,20 +267,22 @@ export default function KnowledgeVault() {
             gap: "6px",
             alignItems: "center",
             fontSize: "12px",
-            color: "var(--color-muted)",
+            color: "var(--color-text-muted)",
           }}
         >
-          <span style={{ fontWeight: 600 }}>Supported Formats:</span>
+          <span style={{ fontWeight: 600, color: "var(--color-text-secondary)" }}>Supported Formats:</span>
           {["PDF", "DOC", "DOCX", "PPT", "PPTX", "TXT", "MD", "CSV", "RTF", "HTML", "JSON", "XML"].map((fmt) => (
             <span
               key={fmt}
               style={{
-                background: "rgba(255, 255, 255, 0.06)",
-                border: "1px solid rgba(255, 255, 255, 0.1)",
-                padding: "2px 6px",
+                background: "rgba(255, 255, 255, 0.08)",
+                border: "1px solid rgba(56, 189, 248, 0.25)",
+                color: "var(--color-text)",
+                padding: "2px 8px",
                 borderRadius: "4px",
                 fontFamily: "monospace",
-                fontSize: "11px",
+                fontSize: "12px",
+                fontWeight: 500,
               }}
             >
               .{fmt.toLowerCase()}

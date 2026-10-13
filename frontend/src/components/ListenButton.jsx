@@ -126,7 +126,7 @@ export default function ListenButton({ text, compact = false, initialLang = "aut
                 ? "bg-red-500/10 text-red-600 dark:text-red-400 font-bold"
                 : state === "loading"
                 ? "bg-emerald-500/10 text-emerald-600 animate-pulse"
-                : "text-slate-500 hover:text-emerald-600 hover:bg-slate-200/50 dark:hover:bg-zinc-700/50"
+                : "text-slate-500 dark:text-slate-300 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-slate-200/50 dark:hover:bg-zinc-700/50"
             }`}
             onClick={state === "playing" ? stop : play}
             disabled={state === "loading"}
@@ -139,7 +139,7 @@ export default function ListenButton({ text, compact = false, initialLang = "aut
         </Tooltip>
         {error && (
           <Tooltip content={error}>
-            <span className="text-[10px] text-red-500 cursor-help" role="alert">⚠️</span>
+            <span className="text-[11px] text-red-500 cursor-help" role="alert">⚠️</span>
           </Tooltip>
         )}
       </span>
@@ -157,7 +157,7 @@ export default function ListenButton({ text, compact = false, initialLang = "aut
         title="Speech language: Auto detect matches the script automatically"
         style={{
           height: 28,
-          fontSize: "11px",
+          fontSize: "12px",
           padding: "0 22px 0 6px",
           width: "auto",
           minWidth: 84,

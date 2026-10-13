@@ -2,6 +2,8 @@ import { useEffect, useState, useCallback } from "react";
 import { useParams, Link } from "react-router-dom";
 import { documentsApi } from "../api";
 import { apiDownload } from "../api/client";
+import { useProfile } from "../context/ProfileContext";
+import { useAuth } from "../context/AuthContext";
 import {
   Card, ClassificationBadge, StatusBadge, LoadingState, ErrorState,
   Button, DefList, Skeleton, EmptyState, useToasts, ToastContainer,
@@ -18,6 +20,8 @@ const ACTION = {
 
 export default function DocumentDetails() {
   const { id } = useParams();
+  const { auth } = useAuth();
+  const { getDisplayName } = useProfile();
   const [doc, setDoc] = useState(null);
   const [chunks, setChunks] = useState(null);
   const [error, setError] = useState(null);
@@ -94,7 +98,7 @@ export default function DocumentDetails() {
         <Card title="Metadata" subtitle="Integrity and provenance">
           <DefList items={[
             ["Filename", doc.sourceFilename],
-            ["Owner", doc.ownerId],
+            ["Owner", doc.ownerId === auth?.userId ? `${getDisplayName()} (You)` : (doc.ownerId ? `Officer (${doc.ownerId.slice(0, 8)})` : "—")],
             ["Department", doc.department],
             ["Classification", doc.classification],
             ["Status", doc.status],

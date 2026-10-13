@@ -29,8 +29,11 @@ const CONTROLS = [
 
 const STATE_TONE = { Enforced: "success", Controlled: "warning", Active: "info" };
 
+import { useProfile } from "../context/ProfileContext";
+
 export default function Dashboard() {
   const { auth } = useAuth();
+  const { profile, getDisplayName, openProfile } = useProfile();
   const navigate = useNavigate();
   const [docs, setDocs] = useState(null);
   const [error, setError] = useState(null);
@@ -62,8 +65,29 @@ export default function Dashboard() {
     <div className="ui-stack">
       <header className="ui-page-head">
         <div>
-          <h1 className="ui-page-head__title">Welcome back, {auth?.userId}</h1>
-          <p className="ui-page-head__sub">Work securely with your authorized knowledge.</p>
+          <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
+            <h1 className="ui-page-head__title">Welcome back, {getDisplayName()}</h1>
+            <button
+              type="button"
+              onClick={openProfile}
+              style={{
+                fontSize: "12px",
+                padding: "3px 8px",
+                borderRadius: "6px",
+                background: "rgba(56, 189, 248, 0.12)",
+                border: "1px solid rgba(56, 189, 248, 0.3)",
+                color: "#38bdf8",
+                cursor: "pointer",
+                fontWeight: 600,
+              }}
+              title="Edit Profile"
+            >
+              ✎ Edit Profile
+            </button>
+          </div>
+          <p className="ui-page-head__sub">
+            {profile.title || "Intelligence Analyst"} • {profile.department || "Authorized Workspace"}
+          </p>
         </div>
         <Button variant="primary" leftIcon={Icon.chat} onClick={() => navigate("/assistant")}>
           Ask SACHET AI

@@ -1345,7 +1345,7 @@ export default function Assistant() {
                       >
                         {/* Message Header with actions for Assistant */}
                         {!isUser && (
-                          <div className="flex items-center justify-between gap-3 pb-1.5 mb-1.5 border-b border-slate-200/80 dark:border-zinc-700/80 text-[11px] text-slate-500">
+                          <div className="flex items-center justify-between gap-3 pb-1.5 mb-1.5 border-b border-slate-200/80 dark:border-zinc-700/80 text-xs text-slate-500 dark:text-slate-300">
                             <span className="font-semibold text-emerald-700 dark:text-emerald-400 flex items-center gap-1">
                               SACHET AI
                             </span>
@@ -1355,7 +1355,7 @@ export default function Assistant() {
                                 <Tooltip content="Copy answer">
                                   <button
                                     type="button"
-                                    className="p-1 hover:text-slate-800 rounded transition-colors"
+                                    className="p-1 text-slate-500 dark:text-slate-300 hover:text-slate-800 dark:hover:text-white rounded transition-colors"
                                     onClick={() => copyMessage(msg.text)}
                                     aria-label="Copy"
                                   >
@@ -1365,7 +1365,7 @@ export default function Assistant() {
                                 <Tooltip content="Generate DOCX / Presentation">
                                   <button
                                     type="button"
-                                    className="p-1 hover:text-slate-800 rounded transition-colors"
+                                    className="p-1 text-slate-500 dark:text-slate-300 hover:text-slate-800 dark:hover:text-white rounded transition-colors"
                                     onClick={() => {
                                       setGenSourceMsg(msg.text);
                                       setGenTitle("Generated briefing");
@@ -1387,13 +1387,13 @@ export default function Assistant() {
                         {/* Sources citations */}
                         {msg.sources?.length > 0 && !msg.streaming && (
                           <div className="mt-2.5 pt-2 border-t border-slate-200/60 dark:border-zinc-700/60 text-xs">
-                            <span className="font-semibold text-slate-600 dark:text-slate-400 block mb-1">Sources:</span>
+                            <span className="font-semibold text-slate-600 dark:text-slate-300 block mb-1">Sources:</span>
                             <div className="flex flex-wrap gap-1.5">
                               {msg.sources.map((s, j) => (
                                 <Link
                                   key={`${s.documentId}-${s.page}-${j}`}
                                   to={`/documents/${s.documentId}/view?page=${s.page ?? 1}`}
-                                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-white dark:bg-zinc-700 border border-slate-200 dark:border-zinc-600 text-[11px] text-emerald-700 dark:text-emerald-300 hover:underline"
+                                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-600 text-xs text-emerald-700 dark:text-emerald-300 hover:underline shadow-sm font-medium"
                                 >
                                   📄 {s.documentTitle || s.documentId} {s.page != null && `(p.${s.page})`}
                                 </Link>
@@ -1403,12 +1403,12 @@ export default function Assistant() {
                         )}
 
                         {msg.insufficient && !msg.streaming && (
-                          <div className="mt-2 text-xs text-amber-700 bg-amber-50 p-2 rounded-lg border border-amber-200">
+                          <div className="mt-2 text-xs text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/50 p-2.5 rounded-lg border border-amber-200 dark:border-amber-700/60 font-medium">
                             ⚠️ I could not find enough authorized source material to answer this reliably.
                           </div>
                         )}
                       </div>
-                      <span className="text-[10px] text-slate-400 mt-1 px-1">
+                      <span className="text-[11px] text-slate-400 dark:text-slate-400 mt-1 px-1">
                         {fmtTime(msg.timestamp)}
                       </span>
                     </div>
