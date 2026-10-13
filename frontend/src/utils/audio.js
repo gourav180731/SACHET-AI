@@ -50,6 +50,8 @@ export function cleanTextForSpeech(text) {
  */
 export function detectLanguageFromText(text) {
   if (!text) return "en-IN";
+
+  // Check distinctive Indian scripts first
   for (const ch of text) {
     const code = ch.charCodeAt(0);
     if (code >= 0x0a00 && code <= 0x0a7f) return "pa-IN"; // Gurmukhi (Punjabi)
@@ -60,8 +62,47 @@ export function detectLanguageFromText(text) {
     if (code >= 0x0c80 && code <= 0x0cff) return "kn-IN"; // Kannada
     if (code >= 0x0d00 && code <= 0x0d7f) return "ml-IN"; // Malayalam
     if (code >= 0x0600 && code <= 0x06ff) return "ur-IN"; // Urdu
-    if (code >= 0x0900 && code <= 0x097f) return "mai-IN"; // Devanagari (Maithili/Hindi)
   }
+
+  // Devanagari script: differentiate Maithili vs Marathi vs Hindi
+  let hasDevanagari = false;
+  for (const ch of text) {
+    const code = ch.charCodeAt(0);
+    if (code >= 0x0900 && code <= 0x097f) {
+      hasDevanagari = true;
+      break;
+    }
+  }
+
+  if (hasDevanagari) {
+    const lower = text.toLowerCase();
+    // Distinctive Maithili dialect vocabulary and verbal inflections
+    const maithiliMarkers = [
+      "की हाल", "हाल चाल", "बढ़िया", "छै", "अछि", "दलोहान", "अहाँ", "हमर", "तोहर",
+      "कहलहुं", "देलहुं", "ओकरा", "एहि", "ओहि", "सभ", "सभटा", "बुझाइत", "नीचाँ",
+      "सोझाँ", "भेल", "भऽ गेल", "कऽ कऽ", "रहल छी", "रहल अछि", "की अछि", "की भेल",
+      "कहू", "बताउ", "बुझाउ", "हमार", "देलियै", "कहलियै", "ब्यौरा", "सार"
+    ];
+    if (maithiliMarkers.some((m) => lower.includes(m))) {
+      return "mai-IN";
+    }
+
+    // Distinctive Marathi markers
+    const marathiMarkers = ["आहे", "नाही", "कसे", "झाले", "करा", "माझे", "तुमचे", "काय", "आहेत"];
+    if (marathiMarkers.some((m) => lower.includes(m))) {
+      return "mr-IN";
+    }
+
+    // Distinctive Hindi markers
+    const hindiMarkers = ["रहा है", "रही है", "रहे हैं", "क्या", "कैसे", "बताइए", "आपका", "हमारे", "होता है"];
+    if (hindiMarkers.some((m) => lower.includes(m))) {
+      return "hi-IN";
+    }
+
+    // Default Devanagari: mai-IN for regional Mithila / Hindi
+    return "mai-IN";
+  }
+
   return "en-IN";
 }
 
@@ -75,8 +116,9 @@ export const ACK_MESSAGES = {
     "One moment, searching documents...",
   ],
   "mai-IN": [
-    "एक सेकंड, अधिकृत दस्तावेज़ देख रहल छी...",
-    "दस्तावेज़ में खोज कऽ रहल छी...",
+    "प्रणाम! एक सेकंड रुकू, अहाँक अधिकृत दस्तावेज़ देखि रहल छी...",
+    "दस्तावेज़ में खोज कऽ रहल छी, तुरंत सबटा बात बताबैत छी...",
+    "अहाँक देल दस्तावेज़ केर जाँच कऽ रहल छी...",
   ],
   "hi-IN": [
     "एक सेकंड, अधिकृत दस्तावेज़ देख रहा हूँ...",
