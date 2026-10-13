@@ -784,7 +784,8 @@ export default function Assistant() {
     abortRef.current = controller;
 
     const mode = overrides.responseMode || responseMode;
-    const lang = overrides.language || (language === "Auto detect" ? "en-IN" : language);
+    const detectedQueryLang = detectLanguageFromText(trimmed);
+    const lang = overrides.language || (language && language !== "Auto detect" && language !== "auto" ? language : (detectedQueryLang || "auto"));
 
     try {
       let full = "";

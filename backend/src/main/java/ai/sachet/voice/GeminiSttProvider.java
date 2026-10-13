@@ -110,16 +110,14 @@ public class GeminiSttProvider implements SttProvider {
         + "3. Output ONLY valid JSON: {\"text\": \"...\", \"language\": \"...\"}";
 
     List<String> candidates = new java.util.ArrayList<>();
+    candidates.add("gemini-flash-lite-latest");
+    candidates.add("gemini-3.1-flash-lite");
+    candidates.add("gemini-3.5-flash-lite");
     String primary = modelId();
-    if (primary != null && !primary.isBlank() && !"gemini-3.8-flash".equals(primary) && !"gemini-1.5-flash".equals(primary) && !"gemini-2.0-flash".equals(primary)) {
+    if (primary != null && !primary.isBlank() && !candidates.contains(primary)) {
       candidates.add(primary);
-    } else {
-      candidates.add("gemini-3.5-flash");
     }
     if (!candidates.contains("gemini-3.5-flash")) candidates.add("gemini-3.5-flash");
-    if (!candidates.contains("gemini-flash-lite-latest")) candidates.add("gemini-flash-lite-latest");
-    if (!candidates.contains("gemini-3-flash-preview")) candidates.add("gemini-3-flash-preview");
-    if (!candidates.contains("gemini-3.1-flash-lite")) candidates.add("gemini-3.1-flash-lite");
 
     RuntimeException lastException = null;
 

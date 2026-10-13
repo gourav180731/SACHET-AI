@@ -127,15 +127,21 @@ public class IngestionWorker {
 
     if (parsed.needsOcr() && parser.ocrCapable()) {
       stage(job, JobStatus.OCR, 60);
-      if (!ocr.available()) {
-        fail(job, IngestionJob.Errors.OCR_UNAVAILABLE,
-            "Scanned document requires OCR, which is unavailable.");
-        return;
-      }
-      parsed = fillOcrBlanks(blob, parsed);
-      if (parsed == null) {
-        fail(job, IngestionJob.Errors.OCR_UNAVAILABLE, "OCR processing failed.");
-        return;
+      if (ocr.available()) {
+        ParsedDocument filled = fillOcrBlanks(blob, parsed);
+        if (filled != null) {
+          parsed = filled;
+        }
+      } else {
+        boolean hasAnyExtractableText = parsed.pages().stream()
+            .anyMatch(p -> p.text() != null && !p.text().isBlank());
+
+        if (!hasAnyExtractableText) {
+          fail(job, IngestionJob.Errors.OCR_UNAVAILABLE,
+              "Scanned document contains no extractable text and OCR is unavailable.");
+          return;
+        }
+        log.warn("OCR engine is unavailable; proceeding with extracted digital text for document {}", doc.getId());
       }
     }
 
@@ -193,7 +199,7 @@ public class IngestionWorker {
         if (page.blank() && byPage.containsKey(page.pageNumber())) {
           String t = byPage.get(page.pageNumber()).strip();
           out.add(new ParsedDocument.ParsedPage(page.pageNumber(), t, page.section(),
-              t.length() < PdfParser.BLANK_THRESHOLD));
+              t.isBlank()));
         } else {
           out.add(page);
         }
@@ -201,7 +207,7 @@ public class IngestionWorker {
       out.sort(Comparator.comparingInt(ParsedDocument.ParsedPage::pageNumber));
       return new ParsedDocument(List.copyOf(out));
     } catch (Exception e) {
-      log.warn("ocr failed type={}", e.getClass().getSimpleName());
+      log.warn("ocr failed type={} message={}", e.getClass().getSimpleName(), e.getMessage());
       return null;
     } finally {
       deleteTree(tmp);

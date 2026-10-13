@@ -333,7 +333,15 @@ export function resolveBrowserVoice(voices, cleanText, langTag) {
     if (urduVoice) return urduVoice;
   }
 
-  // 10. ENGLISH / DEFAULT LATIN
+  // 10. NON-LATIN SCRIPT GUARD:
+  // If text is in an Indian regional script and no dedicated voice exists,
+  // NEVER assign an English voice (David/Zira/etc.)! Returning null allows
+  // the browser/OS to select the native phonetic engine for utterance.lang.
+  if (isDevanagari || isGurmukhi || isBengali || isTamil || isTelugu || isGujarati || isKannada || isMalayalam || isUrdu) {
+    return null;
+  }
+
+  // 11. ENGLISH / DEFAULT LATIN
   const englishVoice =
     // Indian English preferred for regional context
     voices.find((v) => v.lang.toLowerCase() === "en-in" || /india|heera|ravi|neerja/i.test(v.name)) ||

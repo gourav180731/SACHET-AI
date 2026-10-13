@@ -120,8 +120,8 @@ public class GeminiTtsProvider implements TtsProvider {
     String primary = modelId();
     if (primary != null && !primary.isBlank()) candidates.add(primary);
     if (!candidates.contains("gemini-3.8-flash-tts")) candidates.add("gemini-3.8-flash-tts");
-    if (!candidates.contains("gemini-2.5-flash-preview-tts")) candidates.add("gemini-2.5-flash-preview-tts");
-    if (!candidates.contains("gemini-2.5-pro-preview-tts")) candidates.add("gemini-2.5-pro-preview-tts");
+    if (!candidates.contains("gemini-3.8-flash-lite-tts")) candidates.add("gemini-3.8-flash-lite-tts");
+    if (!candidates.contains("gemini-3.1-flash-tts-preview")) candidates.add("gemini-3.1-flash-tts-preview");
 
     RuntimeException lastException = null;
 

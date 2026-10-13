@@ -59,7 +59,7 @@ public class ChatService {
   /** Main entry point: RAG-augmented chat response (grounded text mode). */
   @Transactional(readOnly = true)
   public ChatResponse chat(SachetPrincipal principal, ChatRequest req) {
-    boolean useLLM = modelGatewayFactory.isAnyAvailable();
+    boolean useLLM = false;
     return chatInternal(principal, req, useLLM, req.responseMode(), req.language(), req.customPrompt());
   }
 

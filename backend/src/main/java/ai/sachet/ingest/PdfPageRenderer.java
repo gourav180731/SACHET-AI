@@ -27,7 +27,7 @@ final class PdfPageRenderer {
           throw new IOException("Page out of range.");
         }
         Path png = outDir.resolve("ocr-p" + page + ".png");
-        ImageIO.write(renderer.renderImageWithDPI(page - 1, 200), "PNG", png.toFile());
+        ImageIO.write(renderer.renderImageWithDPI(page - 1, 150), "PNG", png.toFile());
         out.add(png);
       }
       return out;

@@ -185,10 +185,10 @@ export default function ListenButton({ text, compact = false, initialLang = "aut
 
     setState("loading");
 
-    // 2. Fetch server speech with ultra-fast 800ms abort timeout
+    // 2. Fetch server speech with 4500ms timeout for Gemini Cloud TTS
     const controller = new AbortController();
     abortControllerRef.current = controller;
-    const timeoutId = setTimeout(() => controller.abort(), 800);
+    const timeoutId = setTimeout(() => controller.abort(), 4500);
 
     try {
       const token = getToken() || sessionStorage.getItem("sachet.token");
@@ -217,8 +217,10 @@ export default function ListenButton({ text, compact = false, initialLang = "aut
       setHasPlayedOnce(true);
     } catch (err) {
       clearTimeout(timeoutId);
-      serverTtsSupported = false;
-      // Fallback immediately to zero-latency Browser Regional Speech Synthesis
+      if (err?.response?.status === 403 || err?.response?.status === 404) {
+        serverTtsSupported = false;
+      }
+      // Fallback immediately to Browser Regional Speech Synthesis
       try {
         speakWithBrowserSynth(clean.slice(0, 1600), targetLang);
       } catch (synthErr) {

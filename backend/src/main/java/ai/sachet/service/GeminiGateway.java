@@ -95,16 +95,14 @@ public class GeminiGateway implements ModelGateway {
 
   private List<String> getCandidateModels() {
     List<String> list = new java.util.ArrayList<>();
+    list.add("gemini-flash-lite-latest");
+    list.add("gemini-3.1-flash-lite");
+    list.add("gemini-3.5-flash-lite");
     String configured = props.getGeminiModel();
-    if (configured != null && !configured.isBlank() && !"gemini-3.8-flash".equals(configured) && !"gemini-1.5-flash".equals(configured) && !"gemini-2.0-flash".equals(configured)) {
+    if (configured != null && !configured.isBlank() && !list.contains(configured)) {
       list.add(configured);
-    } else {
-      list.add("gemini-3.5-flash");
     }
     if (!list.contains("gemini-3.5-flash")) list.add("gemini-3.5-flash");
-    if (!list.contains("gemini-flash-lite-latest")) list.add("gemini-flash-lite-latest");
-    if (!list.contains("gemini-3-flash-preview")) list.add("gemini-3-flash-preview");
-    if (!list.contains("gemini-3.1-flash-lite")) list.add("gemini-3.1-flash-lite");
     return list;
   }
 
@@ -187,9 +185,13 @@ public class GeminiGateway implements ModelGateway {
 
     // Language handling
     if (language != null && !language.isBlank() && !"auto".equalsIgnoreCase(language) && !"Auto detect".equalsIgnoreCase(language)) {
-      sb.append("5. LANGUAGE: Respond in ").append(language).append(" (use natural authentic script, e.g. Devanagari for Maithili and Hindi, Gurmukhi for Punjabi, etc.).\n\n");
+      sb.append("5. LANGUAGE DIRECTIVE: You MUST respond entirely in ").append(describeLanguage(language))
+          .append(". Do NOT reply in English unless the question was in English.\n\n");
     } else {
-      sb.append("5. LANGUAGE & TONE: Automatically detect and match the user's spoken/written language and tone. If the user asks in Maithili, answer in fluent Maithili. If in Punjabi, answer in Punjabi. If in Hindi, answer in Hindi. If in English, answer in English.\n\n");
+      sb.append("5. CRITICAL LANGUAGE DIRECTIVE: Automatically detect the language and script of the user's question. "
+          + "If the question is in Maithili (मैथिली, e.g. using 'की हाल चाल', 'अछि', 'दलोहान', 'हम', 'अहाँ', etc.), you MUST answer ENTIRELY in authentic Maithili language using Devanagari script. "
+          + "If the question is in Hindi, answer in Hindi. If in Punjabi, answer in Punjabi. If in Bengali, answer in Bengali. If in English, answer in English. "
+          + "NEVER fall back to English when the user queries in an Indian regional language.\n\n");
     }
 
     // Response mode instructions
@@ -226,9 +228,32 @@ public class GeminiGateway implements ModelGateway {
     return sb.toString();
   }
 
+  private String describeLanguage(String tag) {
+    if (tag == null || tag.isBlank()) return "English";
+    String base = tag.split("-")[0].toLowerCase(java.util.Locale.ROOT);
+    return switch (base) {
+      case "mai" -> "Maithili (मैथिली) language in Devanagari script";
+      case "hi" -> "Hindi (हिन्दी) language in Devanagari script";
+      case "pa" -> "Punjabi (ਪੰਜਾਬੀ) language in Gurmukhi script";
+      case "bn" -> "Bengali (বাংলা) language in Bengali script";
+      case "ta" -> "Tamil (தமிழ்) language in Tamil script";
+      case "te" -> "Telugu (తెలుగు) language in Telugu script";
+      case "mr" -> "Marathi (मराठी) language in Devanagari script";
+      case "gu" -> "Gujarati (ગુજરાતી) language in Gujarati script";
+      case "kn" -> "Kannada (ಕನ್ನಡ) language in Kannada script";
+      case "ml" -> "Malayalam (മലയാളം) language in Malayalam script";
+      case "ur" -> "Urdu (اردو) language in Urdu script";
+      case "or" -> "Odia (ଓଡ଼ିଆ) language in Odia script";
+      case "as" -> "Assamese (অসমীয়া) language in Assamese script";
+      case "ks" -> "Kashmiri (कॉशुर) language";
+      case "en" -> "English";
+      default -> tag;
+    };
+  }
+
   private String buildUserPrompt(String query, String ragContext) {
     return "USER QUESTION: " + query + "\n\n" +
         "GROUNDED CONTEXT (AUTHORIZED DOCUMENT EXCERPTS):\n" + ragContext + "\n\n" +
-        "ANSWER BASED ONLY ON THE ABOVE CONTEXT:";
+        "ANSWER BASED ONLY ON THE ABOVE CONTEXT (ensure output matches the user question language and cite sources [doc:Title vX pY]):";
   }
 }

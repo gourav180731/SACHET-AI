@@ -130,6 +130,27 @@ public class RagService {
     }
     boolean isDocumentScoped = docIds != null && !docIds.isEmpty();
     boolean isSynthesis = isSynthesisQuery(query);
+
+    if (items.isEmpty() && isDocumentScoped) {
+      List<String> readableIds = documents.findReadableIds(user.getId(), roles, user.getDepartment(), bands, org.springframework.data.domain.Pageable.unpaged());
+      for (String did : docIds) {
+        if (!readableIds.contains(did)) {
+          continue; // unauthorized document: strictly ignored
+        }
+        Document d = documents.findById(did).orElse(null);
+        if (d != null) {
+          List<DocumentChunk> docChunks = chunks.findByDocumentIdOrderByChunkIndexAsc(did);
+          for (DocumentChunk c : docChunks.stream().limit(k).toList()) {
+            items.add(new ResultItem(c.getId(), d.getId(), d.getTitle(), d.getVersion(),
+                c.getPageNumber(), c.getSection(), 0.6, 0.6));
+          }
+        }
+      }
+      if (!items.isEmpty()) {
+        best = Math.max(best, 0.6);
+      }
+    }
+
     var evidence = EvidenceEvaluator.evaluate(best, items.size(), props, isDocumentScoped || isSynthesis);
     List<String> returned = items.stream().map(ResultItem::documentId).distinct().limit(50).toList();
     audit.append(user.getId(), "search.executed", returned, null, "count=" + items.size(), "");
@@ -150,6 +171,10 @@ public class RagService {
         || q.contains("what is this") || q.contains("tell me about") || q.contains("key points")
         || q.contains("highlights") || q.contains("review") || q.contains("analyze")
         || q.contains("analysis") || q.contains("about this document") || q.contains("about this pdf")
-        || q.contains("about the document") || q.contains("about the pdf") || q.contains("main points");
+        || q.contains("about the document") || q.contains("about the pdf") || q.contains("main points")
+        || q.contains("बताओ") || q.contains("समझाओ") || q.contains("बारे में") || q.contains("डेटा")
+        || q.contains("पीडीएफ") || q.contains("हाल चाल") || q.contains("की हाल") || q.contains("विश्लेषण")
+        || q.contains("जानकारी") || q.contains("दस्तावेज") || q.contains("दस्तावेज़") || q.contains("की अछि")
+        || q.contains("की भेल") || q.contains("बताउ") || q.contains("बुझाउ") || q.contains("कहो");
   }
 }
