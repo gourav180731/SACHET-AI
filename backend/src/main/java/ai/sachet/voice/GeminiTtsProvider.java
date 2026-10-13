@@ -145,8 +145,12 @@ public class GeminiTtsProvider implements TtsProvider {
         log.warn("Gemini TTS with model {} failed ({}).",
             targetModel, e.getMessage());
         lastException = e;
-        if (e.getMessage() != null && e.getMessage().contains("429")) {
-          // Break immediately on quota exhaustion so frontend falls back instantly
+        String msg = e.getMessage() == null ? "" : e.getMessage().toUpperCase(Locale.ROOT);
+        if (msg.contains("429") || msg.contains("403") || msg.contains("401") || msg.contains("404")
+            || msg.contains("PERMISSION_DENIED") || msg.contains("NOT_FOUND")
+            || msg.contains("RESOURCE_EXHAUSTED") || msg.contains("UNAUTHENTICATED")
+            || msg.contains("BILLING")) {
+          // Break immediately on quota/permission/billing/model errors so caller falls back instantly without buffering
           break;
         }
       }

@@ -2,7 +2,9 @@ import { useEffect, useRef, useState } from "react";
 import { voiceApi, fetchSpeech } from "../api/phase5";
 import { getToken } from "../api/client";
 import { Tooltip } from "./UI";
-import { pcmToWav, cleanTextForSpeech, detectLanguageFromText } from "../utils/audio";
+import { pcmToWav, cleanTextForSpeech, detectLanguageFromText, speakBrowserText } from "../utils/audio";
+
+let serverTtsSupported = null;
 
 const LANGUAGES = [
   ["auto", "🌐 Auto Detect"],
@@ -93,46 +95,31 @@ export default function ListenButton({ text, compact = false, initialLang = "aut
     return detectLanguageFromText(clean);
   };
 
-  const speakWithBrowserSynth = (cleanSpeechText, langTag) => {
-    if (typeof window === "undefined" || !window.speechSynthesis) {
-      throw new Error("Speech synthesis is not supported in this environment.");
-    }
-    window.speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(cleanSpeechText);
-    utterance.rate = 1.0;
-    utterance.pitch = 1.0;
-    utterance.lang = langTag || "en-IN";
-
-    // Match best available voice
-    const voices = window.speechSynthesis.getVoices();
-    if (voices && voices.length > 0) {
-      const prefix = (langTag || "en").split("-")[0].toLowerCase();
-      const match = voices.find((v) => v.lang.toLowerCase() === langTag.toLowerCase()) ||
-                    voices.find((v) => v.lang.toLowerCase().startsWith(prefix)) ||
-                    voices.find((v) => v.lang.includes("IN") || v.name.includes("India") || v.name.includes("Hindi"));
-      if (match) utterance.voice = match;
-    }
-
-    utterance.onstart = () => {
+  const speakWithBrowserSynth = async (cleanSpeechText, langTag) => {
+    try {
       modeRef.current = "synth";
       setState("playing");
       setHasPlayedOnce(true);
-    };
 
-    utterance.onend = () => {
+      await speakBrowserText(cleanSpeechText, langTag, {
+        onStart: () => {
+          modeRef.current = "synth";
+          setState("playing");
+          setHasPlayedOnce(true);
+        },
+        onEnd: () => {
+          setState("idle");
+        },
+        onError: (e) => {
+          if (e && e.error !== "canceled" && e.error !== "interrupted") {
+            setState("idle");
+          }
+        },
+      });
+    } catch (err) {
+      console.warn("Browser regional speech synthesis failed:", err);
       setState("idle");
-    };
-
-    utterance.onerror = (e) => {
-      if (e.error !== "canceled" && e.error !== "interrupted") {
-        setState("idle");
-      }
-    };
-
-    window.speechSynthesis.speak(utterance);
-    modeRef.current = "synth";
-    setState("playing");
-    setHasPlayedOnce(true);
+    }
   };
 
   const play = async (forceRestart = false) => {
@@ -156,7 +143,6 @@ export default function ListenButton({ text, compact = false, initialLang = "aut
     if (state === "playing" && !forceRestart) return;
 
     setError(null);
-    setState("loading");
 
     const clean = cleanTextForSpeech(text);
     if (!clean || !clean.trim()) {
@@ -179,8 +165,7 @@ export default function ListenButton({ text, compact = false, initialLang = "aut
 
         audio.onended = () => setState("idle");
         audio.onerror = () => {
-          // If cached audio has an issue, fallback to browser synth
-          speakWithBrowserSynth(clean.slice(0, 1500), targetLang);
+          speakWithBrowserSynth(clean.slice(0, 1600), targetLang);
         };
 
         await audio.play();
@@ -192,17 +177,25 @@ export default function ListenButton({ text, compact = false, initialLang = "aut
       }
     }
 
-    // 2. Fetch server speech with fast fallback to browser native speech
+    // If server TTS was already determined unviable (e.g. 403 on cloud audio), 0ms instant native voice!
+    if (serverTtsSupported === false) {
+      speakWithBrowserSynth(clean.slice(0, 1600), targetLang);
+      return;
+    }
+
+    setState("loading");
+
+    // 2. Fetch server speech with ultra-fast 800ms abort timeout
     const controller = new AbortController();
     abortControllerRef.current = controller;
-    const timeoutId = setTimeout(() => controller.abort(), 3500); // 3.5s timeout for ultra-fast reaction
+    const timeoutId = setTimeout(() => controller.abort(), 800);
 
     try {
       const token = getToken() || sessionStorage.getItem("sachet.token");
-      // Cap speech text to first 1200 chars for rapid response on long documents
       const snippet = clean.slice(0, 1400);
-      const blob = await fetchSpeech(snippet, targetLang, token);
+      const blob = await fetchSpeech(snippet, targetLang, token, controller.signal);
       clearTimeout(timeoutId);
+      serverTtsSupported = true;
 
       const raw = await blob.arrayBuffer();
       const wav = pcmToWav(raw, 24000);
@@ -216,7 +209,7 @@ export default function ListenButton({ text, compact = false, initialLang = "aut
 
       audio.onended = () => setState("idle");
       audio.onerror = () => {
-        speakWithBrowserSynth(clean.slice(0, 1500), targetLang);
+        speakWithBrowserSynth(clean.slice(0, 1600), targetLang);
       };
 
       await audio.play();
@@ -224,11 +217,12 @@ export default function ListenButton({ text, compact = false, initialLang = "aut
       setHasPlayedOnce(true);
     } catch (err) {
       clearTimeout(timeoutId);
-      // Fallback immediately to zero-latency Browser Speech Synthesis
+      serverTtsSupported = false;
+      // Fallback immediately to zero-latency Browser Regional Speech Synthesis
       try {
-        speakWithBrowserSynth(clean.slice(0, 1500), targetLang);
+        speakWithBrowserSynth(clean.slice(0, 1600), targetLang);
       } catch (synthErr) {
-        console.warn("Both server and browser TTS failed:", synthErr);
+        console.warn("Both server and browser regional TTS failed:", synthErr);
         setError("Speech synthesis could not start.");
         setState("idle");
       }

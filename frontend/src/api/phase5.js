@@ -37,7 +37,7 @@ export const voiceApi = {
  * endpoint returns audio bytes. The Authorization header is attached the same
  * way, so authorization is unchanged.
  */
-export async function fetchSpeech(text, language, token) {
+export async function fetchSpeech(text, language, token, signal) {
   const base = import.meta.env.VITE_API_BASE || "http://localhost:8000/api/v1";
   const res = await fetch(`${base}/voice/speak`, {
     method: "POST",
@@ -46,6 +46,7 @@ export async function fetchSpeech(text, language, token) {
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
     body: JSON.stringify({ text, language }),
+    signal,
   });
 
   if (!res.ok) {

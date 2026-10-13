@@ -3,7 +3,7 @@ import { useSearchParams, Link } from "react-router-dom";
 import { chatApi, documentsApi } from "../api";
 import { generationApi, voiceApi, fetchSpeech } from "../api/phase5";
 import { getToken } from "../api/client";
-import { pcmToWav, cleanTextForSpeech, detectLanguageFromText, getInstantAck } from "../utils/audio";
+import { pcmToWav, cleanTextForSpeech, detectLanguageFromText, getInstantAck, speakBrowserText } from "../utils/audio";
 import ListenButton from "../components/ListenButton";
 import VoiceOrb from "../components/VoiceOrb";
 import {
@@ -305,9 +305,11 @@ export default function Assistant() {
       return;
     }
 
-    const speechLang = (!lang || lang === "Auto detect")
-      ? detectLanguageFromText(cleanText)
-      : lang;
+    // Auto-detect language directly from the text so regional answers speak in their authentic native phonetics
+    const textLang = detectLanguageFromText(cleanText);
+    const speechLang = (textLang && textLang !== "en-IN")
+      ? textLang
+      : ((!lang || lang === "Auto detect") ? "en-IN" : lang);
 
     const snippet = cleanText.slice(0, 1400);
 
@@ -317,39 +319,25 @@ export default function Assistant() {
       if (startListeningRef.current) startListeningRef.current(true);
     };
 
-    const fallbackToBrowserSynth = () => {
-      if (typeof window !== "undefined" && window.speechSynthesis) {
-        try {
-          window.speechSynthesis.cancel();
-          const utt = new SpeechSynthesisUtterance(snippet);
-          utt.lang = speechLang || "en-IN";
-          utt.rate = 1.0;
-          utt.pitch = 1.0;
-
-          const voices = window.speechSynthesis.getVoices();
-          if (voices && voices.length > 0) {
-            const prefix = (speechLang || "en").split("-")[0].toLowerCase();
-            const match = voices.find((v) => v.lang.toLowerCase() === speechLang.toLowerCase()) ||
-                          voices.find((v) => v.lang.toLowerCase().startsWith(prefix)) ||
-                          voices.find((v) => v.lang.includes("IN") || v.name.includes("India") || v.name.includes("Hindi"));
-            if (match) utt.voice = match;
-          }
-
-          utt.onend = onFinish;
-          utt.onerror = onFinish;
-          window.speechSynthesis.speak(utt);
-          return;
-        } catch { /* proceed */ }
+    const fallbackToBrowserSynth = async () => {
+      try {
+        await speakBrowserText(snippet, speechLang, {
+          onStart: () => {},
+          onEnd: onFinish,
+          onError: onFinish,
+        });
+      } catch (err) {
+        console.warn("Browser regional TTS fallback error:", err);
+        onFinish();
       }
-      onFinish();
     };
 
     const timeoutController = new AbortController();
-    const timeoutId = setTimeout(() => timeoutController.abort(), 3200);
+    const timeoutId = setTimeout(() => timeoutController.abort(), 800);
 
     try {
       const token = getToken() || sessionStorage.getItem("sachet.token");
-      const blob = await fetchSpeech(snippet, speechLang, token);
+      const blob = await fetchSpeech(snippet, speechLang, token, timeoutController.signal);
       clearTimeout(timeoutId);
 
       const raw = await blob.arrayBuffer();
@@ -390,7 +378,10 @@ export default function Assistant() {
     const controller = new AbortController();
     abortRef.current = controller;
 
-    const lang = (!activeLang || activeLang === "Auto detect") ? "en-IN" : activeLang;
+    const detectedQueryLang = detectLanguageFromText(query);
+    const lang = (activeLang && activeLang !== "Auto detect" && activeLang !== "auto")
+      ? activeLang
+      : (detectedQueryLang !== "en-IN" ? detectedQueryLang : "en-IN");
 
     try {
       let full = "";
