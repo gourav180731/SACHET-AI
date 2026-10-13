@@ -39,6 +39,8 @@ export function cleanTextForSpeech(text) {
     .replace(/\[doc:[^\]]+\]/gi, "")
     .replace(/\[SOURCE\s*\d+:[^\]]+\]/gi, "")
     .replace(/```[\s\S]*?```/g, "")
+    .replace(/\((?:Executive Overview|Detailed Findings|Key Insights|Overview)\)/gi, "")
+    .replace(/^[\s*-]+/gm, "")
     .replace(/[*_#`~>]/g, "")
     .replace(/\s+/g, " ")
     .trim();

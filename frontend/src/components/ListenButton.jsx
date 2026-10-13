@@ -177,18 +177,12 @@ export default function ListenButton({ text, compact = false, initialLang = "aut
       }
     }
 
-    // If server TTS was already determined unviable (e.g. 403 on cloud audio), 0ms instant native voice!
-    if (serverTtsSupported === false) {
-      speakWithBrowserSynth(clean.slice(0, 1600), targetLang);
-      return;
-    }
-
     setState("loading");
 
-    // 2. Fetch server speech with 4500ms timeout for Gemini Cloud TTS
+    // 2. Fetch server speech with 15000ms timeout for high-fidelity Gemini neural TTS
     const controller = new AbortController();
     abortControllerRef.current = controller;
-    const timeoutId = setTimeout(() => controller.abort(), 4500);
+    const timeoutId = setTimeout(() => controller.abort(), 15000);
 
     try {
       const token = getToken() || sessionStorage.getItem("sachet.token");

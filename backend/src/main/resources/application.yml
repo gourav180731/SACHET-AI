@@ -62,7 +62,7 @@ sachet:
   # text is derived from retrieved document excerpts, so synthesising it is an
   # external transfer of document-derived content.
   tts-provider: ${SACHET_TTS_PROVIDER:gemini}
-  tts-model: ${SACHET_TTS_MODEL:gemini-3.8-flash-tts}
+  tts-model: ${SACHET_TTS_MODEL:gemini-3.8-flash-lite-tts}
   wake-model-dir: ${SACHET_WAKE_MODEL_DIR:./models/wake}
   keywords-file: ${SACHET_KEYWORDS_FILE:keywords.txt}
   audio-sample-rate: ${SACHET_AUDIO_SAMPLE_RATE:16000}

@@ -243,6 +243,24 @@ export default function Assistant() {
     } catch { /* noop */ }
   }, []);
 
+  const playStartListeningTone = useCallback(() => {
+    try {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (!AudioCtx) return;
+      const ctx = new AudioCtx();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.frequency.setValueAtTime(440, ctx.currentTime); // A4
+      osc.frequency.exponentialRampToValueAtTime(659.25, ctx.currentTime + 0.08); // E5
+      gain.gain.setValueAtTime(0.12, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.18);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.2);
+    } catch { /* noop */ }
+  }, []);
+
   const stopSpeaking = useCallback(() => {
     if (speechAudioRef.current) {
       try {
@@ -332,8 +350,9 @@ export default function Assistant() {
       }
     };
 
+    // Allow 15000ms for high-fidelity Gemini neural TTS synthesis
     const timeoutController = new AbortController();
-    const timeoutId = setTimeout(() => timeoutController.abort(), 800);
+    const timeoutId = setTimeout(() => timeoutController.abort(), 15000);
 
     try {
       const token = getToken() || sessionStorage.getItem("sachet.token");
@@ -467,6 +486,7 @@ export default function Assistant() {
     // 1. INSTANT BROWSER TRANSCRIPTION CHECK (0ms latency!)
     const liveTranscript = liveSpeechRef.current?.trim();
     if (liveTranscript && liveTranscript.length >= 2) {
+      playWakeChime();
       setVoiceState("THINKING");
       const detected = detectLanguageFromText(liveTranscript);
       setDetectedLangDisplay(detected);
@@ -503,6 +523,7 @@ export default function Assistant() {
     }
 
     // Transition to THINKING
+    playWakeChime();
     setVoiceState("THINKING");
     const activeAck = getInstantAck(language === "Auto detect" ? "en-IN" : language);
     setInstantAck(activeAck);
@@ -562,6 +583,7 @@ export default function Assistant() {
       setIsFollowUp(followUp);
       setRecordingSeconds(0);
       setVoiceState("LISTENING");
+      playStartListeningTone();
 
       // Launch concurrent browser SpeechRecognition for 0ms recognition latency
       const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;

@@ -91,7 +91,7 @@ public class GeminiTtsProvider implements TtsProvider {
   @Override
   public String modelId() {
     String configured = props.getTtsModel();
-    return (configured == null || configured.isBlank()) ? "gemini-3.8-flash-tts" : configured;
+    return (configured == null || configured.isBlank()) ? "gemini-3.8-flash-lite-tts" : configured;
   }
 
   @Override
@@ -113,15 +113,18 @@ public class GeminiTtsProvider implements TtsProvider {
     }
 
     // The model auto-detects language, but an explicit BCP-47 tag avoids
-    // mispronouncing short regional text. Gemini 3.8 Flash TTS documents Maithili.
+    // mispronouncing short regional text. Gemini Flash Lite TTS natively supports Maithili, Punjabi, Bengali, etc.
     String languageCode = normalizeLanguage(languageHint);
 
     List<String> candidates = new java.util.ArrayList<>();
     String primary = modelId();
-    if (primary != null && !primary.isBlank()) candidates.add(primary);
-    if (!candidates.contains("gemini-3.8-flash-tts")) candidates.add("gemini-3.8-flash-tts");
+    if (primary != null && !primary.isBlank() && !candidates.contains(primary)) {
+      candidates.add(primary);
+    }
     if (!candidates.contains("gemini-3.8-flash-lite-tts")) candidates.add("gemini-3.8-flash-lite-tts");
     if (!candidates.contains("gemini-3.1-flash-tts-preview")) candidates.add("gemini-3.1-flash-tts-preview");
+    if (!candidates.contains("gemini-2.5-flash-preview-tts")) candidates.add("gemini-2.5-flash-preview-tts");
+    if (!candidates.contains("gemini-3.8-flash-tts")) candidates.add("gemini-3.8-flash-tts");
 
     RuntimeException lastException = null;
 
@@ -137,22 +140,15 @@ public class GeminiTtsProvider implements TtsProvider {
 
         byte[] data = firstInlineAudio(res);
         if (data != null && data.length > 0) {
+          log.info("Gemini TTS succeeded using model {}", targetModel);
           return new Audio(data, AUDIO_MIME);
         }
       } catch (IllegalStateException | IllegalArgumentException e) {
         throw e;
       } catch (RuntimeException e) {
-        log.warn("Gemini TTS with model {} failed ({}).",
+        log.warn("Gemini TTS with model {} failed ({}). Trying next candidate...",
             targetModel, e.getMessage());
         lastException = e;
-        String msg = e.getMessage() == null ? "" : e.getMessage().toUpperCase(Locale.ROOT);
-        if (msg.contains("429") || msg.contains("403") || msg.contains("401") || msg.contains("404")
-            || msg.contains("PERMISSION_DENIED") || msg.contains("NOT_FOUND")
-            || msg.contains("RESOURCE_EXHAUSTED") || msg.contains("UNAUTHENTICATED")
-            || msg.contains("BILLING")) {
-          // Break immediately on quota/permission/billing/model errors so caller falls back instantly without buffering
-          break;
-        }
       }
     }
 
