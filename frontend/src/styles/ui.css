@@ -491,7 +491,7 @@ a.ui-card:hover { text-decoration: none; }
 .ui-table__title { font-weight: 500; color: #f8fafc; }
 .ui-table__title:hover { color: #38bdf8; }
 .ui-table__meta { font-size: var(--font-size-xs); color: var(--color-text-muted); }
-.ui-table__actions { display: flex; gap: 6px; justify-content: flex-end; }
+.ui-table__actions { display: flex; gap: 8px; justify-content: flex-end; align-items: center; }
 .ui-table--compact th, .ui-table--compact td { padding: 8px 12px; }
 
 .ui-pager { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); margin-top: var(--space-4); flex-wrap: wrap; }
@@ -1077,4 +1077,144 @@ a.ui-card:hover { text-decoration: none; }
   -webkit-mask: linear-gradient(#0004, #000);
   background-repeat: repeat;
   opacity: 0.65;
+}
+
+/* ==========================================================================
+   Bin / Delete Button (Animated Trash Can)
+   ========================================================================== */
+.bin-button {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 55px;
+  height: 55px;
+  border-radius: 50%;
+  background-color: rgb(255, 95, 95);
+  cursor: pointer;
+  border: 2px solid rgb(255, 201, 201);
+  transition-duration: 0.3s;
+  position: relative;
+  overflow: hidden;
+  padding: 0;
+  flex-shrink: 0;
+  vertical-align: middle;
+  box-shadow: 0 2px 8px rgba(239, 68, 68, 0.4);
+}
+
+.bin-button--lg {
+  width: 55px;
+  height: 55px;
+}
+
+.bin-button--md {
+  width: 42px;
+  height: 42px;
+}
+
+.bin-button--sm {
+  width: 32px;
+  height: 32px;
+  border-width: 1.5px;
+}
+
+.bin-button--xs {
+  width: 24px;
+  height: 24px;
+  border-width: 1px;
+}
+
+.bin-button .bin-bottom {
+  width: 15px;
+  z-index: 2;
+  display: block;
+}
+
+.bin-button--md .bin-bottom {
+  width: 12px;
+}
+
+.bin-button--sm .bin-bottom {
+  width: 10px;
+}
+
+.bin-button--xs .bin-bottom {
+  width: 8px;
+}
+
+.bin-button .bin-top {
+  width: 17px;
+  transform-origin: right;
+  transition-duration: 0.3s;
+  z-index: 2;
+  display: block;
+}
+
+.bin-button--md .bin-top {
+  width: 14px;
+}
+
+.bin-button--sm .bin-top {
+  width: 11px;
+}
+
+.bin-button--xs .bin-top {
+  width: 9px;
+}
+
+.bin-button:hover:not(:disabled) .bin-top {
+  transform: rotate(45deg);
+}
+
+.bin-button:hover:not(:disabled) {
+  background-color: rgb(255, 0, 0);
+  box-shadow: 0 4px 14px rgba(255, 0, 0, 0.6);
+}
+
+.bin-button:active:not(:disabled) {
+  transform: scale(0.9);
+}
+
+.bin-button .garbage {
+  position: absolute;
+  width: 14px;
+  height: auto;
+  z-index: 1;
+  opacity: 0;
+  transition: all 0.3s;
+  pointer-events: none;
+}
+
+.bin-button--md .garbage {
+  width: 11px;
+}
+
+.bin-button--sm .garbage {
+  width: 9px;
+}
+
+.bin-button--xs .garbage {
+  width: 7px;
+}
+
+.bin-button:hover:not(:disabled) .garbage {
+  animation: bin-throw 0.4s linear;
+}
+
+.bin-button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  filter: grayscale(0.5);
+  box-shadow: none;
+}
+
+@keyframes bin-throw {
+  from {
+    transform: translate(-300%, -500%);
+    opacity: 0;
+  }
+  to {
+    transform: translate(0%, 0%);
+    opacity: 1;
+  }
 }

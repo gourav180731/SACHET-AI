@@ -1,4 +1,5 @@
 export { default as Button } from "./Button";
+export { default as DeleteButton } from "../DeleteButton";
 export { default as Card } from "./Card";
 export { default as Input, Textarea, Select, Checkbox } from "./Input";
 export { default as Badge, ClassificationBadge, StatusBadge } from "./Badge";

@@ -3,7 +3,7 @@ import { artifactApi } from "../api/phase5";
 import { apiDownload } from "../api/client";
 import {
   Card, EmptyState, ErrorState, ClassificationBadge,
-  Pagination, Button, ConfirmDialog, useToasts, ToastContainer, Skeleton,
+  Pagination, Button, DeleteButton, ConfirmDialog, useToasts, ToastContainer, Skeleton, Tooltip,
 } from "../components/UI";
 
 const PAGE_SIZE = 20;
@@ -109,9 +109,17 @@ export default function Generated() {
                       <td className="ui-small ui-muted">{a.createdAt ? new Date(a.createdAt).toLocaleString() : "—"}</td>
                       <td><ClassificationBadge value={a.classification} size="sm" /></td>
                       <td>
-                        <div className="ui-table__actions">
+                        <div className="ui-table__actions" style={{ alignItems: "center" }}>
                           <Button variant="secondary" size="sm" onClick={() => download(a)} loading={busyId === a.id}>Download</Button>
-                          <Button variant="danger-outline" size="sm" onClick={() => setConfirm(a)} disabled={busyId === a.id}>Delete</Button>
+                          <Tooltip content="Delete permanently">
+                            <DeleteButton
+                              size="sm"
+                              onClick={() => setConfirm(a)}
+                              disabled={busyId === a.id}
+                              title="Delete artifact"
+                              aria-label={`Delete ${a.title}`}
+                            />
+                          </Tooltip>
                         </div>
                       </td>
                     </tr>

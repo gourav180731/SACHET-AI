@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { documentsApi, jobsApi } from "../api";
 import {
-  Card, UploadZone, Button, IngestionStepper, Select, Input,
+  Card, UploadZone, Button, DeleteButton, Tooltip, IngestionStepper, Select, Input,
   Alert, useToasts, ToastContainer, StatusBadge, ClassificationBadge,
 } from "../components/UI";
 
@@ -338,14 +338,15 @@ export default function KnowledgeVault() {
                           >
                             Upload Now
                           </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => removePending(f)}
-                            disabled={busyFile === f.name}
-                          >
-                            Remove
-                          </Button>
+                          <Tooltip content="Remove from staging">
+                            <DeleteButton
+                              size="sm"
+                              onClick={() => removePending(f)}
+                              disabled={busyFile === f.name}
+                              title="Remove file"
+                              aria-label={`Remove ${f.name}`}
+                            />
+                          </Tooltip>
                         </div>
                       </td>
                     </tr>
