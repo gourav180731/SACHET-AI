@@ -5,6 +5,10 @@ import {
   Card, ClassificationBadge, StatusBadge, ErrorState, EmptyState,
   Skeleton, Pagination, Button, DeleteButton, ConfirmDialog, useToasts, ToastContainer, Tooltip,
 } from "../components/UI";
+import { useAuth } from "../context/AuthContext";
+import { useProfile } from "../context/ProfileContext";
+
+const PAGE_SIZE = 20;
 
 export default function Documents() {
   const { auth } = useAuth();
