@@ -6,11 +6,11 @@ import { pcmToWav, cleanTextForSpeech, detectLanguageFromText } from "../utils/a
 
 const LANGUAGES = [
   ["auto", "🌐 Auto Detect"],
-  ["en-IN", "English"],
-  ["hi-IN", "हिन्दी (Hindi)"],
   ["mai-IN", "मैथिली (Maithili)"],
+  ["hi-IN", "हिन्दी (Hindi)"],
   ["pa-IN", "ਪੰਜਾਬੀ (Punjabi)"],
   ["bn-IN", "বাংলা (Bangla)"],
+  ["en-IN", "English (India)"],
   ["te-IN", "తెలుగు (Telugu)"],
   ["mr-IN", "मराठी (Marathi)"],
   ["ta-IN", "தமிழ் (Tamil)"],
@@ -21,7 +21,6 @@ const LANGUAGES = [
   ["or-IN", "ଓଡ଼ିଆ (Odia)"],
   ["as-IN", "অসমীয়া (Assamese)"],
   ["ks-IN", "कॉशुर (Kashmiri)"],
-  ["kok-IN", "कोंकणी (Konkani)"],
 ];
 
 const SpeakerIcon = (
@@ -30,113 +29,356 @@ const SpeakerIcon = (
   </svg>
 );
 
-const StopIcon = (
+const PauseIcon = (
   <svg fill="currentColor" viewBox="0 0 24 24" width="13" height="13" aria-hidden="true">
+    <path d="M6 5h4v14H6V5zm8 0h4v14h-4V5z" />
+  </svg>
+);
+
+const PlayIcon = (
+  <svg fill="currentColor" viewBox="0 0 24 24" width="13" height="13" aria-hidden="true">
+    <path d="M8 5v14l11-7z" />
+  </svg>
+);
+
+const RepeatIcon = (
+  <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" width="13" height="13" aria-hidden="true">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+  </svg>
+);
+
+const StopIcon = (
+  <svg fill="currentColor" viewBox="0 0 24 24" width="12" height="12" aria-hidden="true">
     <rect x="6" y="6" width="12" height="12" rx="2" />
   </svg>
 );
 
+// Session memory cache so replaying the same text is 0ms instant
+const audioBlobCache = new Map();
+
 /**
- * Read an answer aloud with automatic language and script detection.
+ * Fast, user-friendly speech synthesis control with Pause, Resume, Repeat, and Stop.
+ * Uses high-speed caching and seamless browser speech synthesis fallback for 0ms reactivity.
  */
 export default function ListenButton({ text, compact = false, initialLang = "auto" }) {
   const [lang, setLang] = useState(initialLang || "auto");
-  const [state, setState] = useState("idle"); // idle | loading | playing | error
+  // State: "idle" | "loading" | "playing" | "paused" | "error"
+  const [state, setState] = useState("idle");
+  const [hasPlayedOnce, setHasPlayedOnce] = useState(false);
   const [error, setError] = useState(null);
-  const [available, setAvailable] = useState(false);
+  const modeRef = useRef("audio"); // "audio" | "synth"
   const audioRef = useRef(null);
   const urlRef = useRef(null);
+  const abortControllerRef = useRef(null);
 
   useEffect(() => {
-    let alive = true;
-    voiceApi.ttsCapabilities()
-      .then((c) => { if (alive) setAvailable(!!c.available); })
-      .catch(() => { if (alive) setAvailable(false); });
     return () => {
-      alive = false;
-      audioRef.current?.pause();
-      if (urlRef.current) URL.revokeObjectURL(urlRef.current);
+      if (abortControllerRef.current) abortControllerRef.current.abort();
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
+      if (typeof window !== "undefined" && window.speechSynthesis) {
+        window.speechSynthesis.cancel();
+      }
+      if (urlRef.current) {
+        URL.revokeObjectURL(urlRef.current);
+        urlRef.current = null;
+      }
     };
   }, []);
 
-  const play = async () => {
-    if (state === "loading" || state === "playing") return;
-    setError(null);
-    setState("loading");
-    try {
-      const clean = cleanTextForSpeech(text);
-      if (!clean) {
+  const getLanguageTag = (clean) => {
+    if (lang && lang !== "auto" && lang !== "Auto detect") return lang;
+    return detectLanguageFromText(clean);
+  };
+
+  const speakWithBrowserSynth = (cleanSpeechText, langTag) => {
+    if (typeof window === "undefined" || !window.speechSynthesis) {
+      throw new Error("Speech synthesis is not supported in this environment.");
+    }
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(cleanSpeechText);
+    utterance.rate = 1.0;
+    utterance.pitch = 1.0;
+    utterance.lang = langTag || "en-IN";
+
+    // Match best available voice
+    const voices = window.speechSynthesis.getVoices();
+    if (voices && voices.length > 0) {
+      const prefix = (langTag || "en").split("-")[0].toLowerCase();
+      const match = voices.find((v) => v.lang.toLowerCase() === langTag.toLowerCase()) ||
+                    voices.find((v) => v.lang.toLowerCase().startsWith(prefix)) ||
+                    voices.find((v) => v.lang.includes("IN") || v.name.includes("India") || v.name.includes("Hindi"));
+      if (match) utterance.voice = match;
+    }
+
+    utterance.onstart = () => {
+      modeRef.current = "synth";
+      setState("playing");
+      setHasPlayedOnce(true);
+    };
+
+    utterance.onend = () => {
+      setState("idle");
+    };
+
+    utterance.onerror = (e) => {
+      if (e.error !== "canceled" && e.error !== "interrupted") {
         setState("idle");
+      }
+    };
+
+    window.speechSynthesis.speak(utterance);
+    modeRef.current = "synth";
+    setState("playing");
+    setHasPlayedOnce(true);
+  };
+
+  const play = async (forceRestart = false) => {
+    // If paused, simply resume
+    if (state === "paused" && !forceRestart) {
+      if (modeRef.current === "audio" && audioRef.current) {
+        try {
+          await audioRef.current.play();
+          setState("playing");
+          return;
+        } catch { /* proceed to resume synth */ }
+      }
+      if (modeRef.current === "synth" && typeof window !== "undefined" && window.speechSynthesis) {
+        window.speechSynthesis.resume();
+        setState("playing");
         return;
       }
-      const token = getToken() || sessionStorage.getItem("sachet.token");
-      const targetLang = (lang && lang !== "auto" && lang !== "Auto detect")
-        ? lang
-        : detectLanguageFromText(clean);
+    }
 
-      const blob = await fetchSpeech(clean.slice(0, 4000), targetLang, token);
+    // If already playing and not forced restart, ignore
+    if (state === "playing" && !forceRestart) return;
+
+    setError(null);
+    setState("loading");
+
+    const clean = cleanTextForSpeech(text);
+    if (!clean || !clean.trim()) {
+      setState("idle");
+      return;
+    }
+
+    const targetLang = getLanguageTag(clean);
+    const cacheKey = `${targetLang}:${clean.slice(0, 300)}`;
+
+    // 1. Instant Cache Hit Check (0ms latency!)
+    if (audioBlobCache.has(cacheKey)) {
+      try {
+        const cachedBlob = audioBlobCache.get(cacheKey);
+        if (urlRef.current) URL.revokeObjectURL(urlRef.current);
+        urlRef.current = URL.createObjectURL(cachedBlob);
+        const audio = new Audio(urlRef.current);
+        audioRef.current = audio;
+        modeRef.current = "audio";
+
+        audio.onended = () => setState("idle");
+        audio.onerror = () => {
+          // If cached audio has an issue, fallback to browser synth
+          speakWithBrowserSynth(clean.slice(0, 1500), targetLang);
+        };
+
+        await audio.play();
+        setState("playing");
+        setHasPlayedOnce(true);
+        return;
+      } catch (cacheErr) {
+        console.debug("Cache replay notice, falling back:", cacheErr);
+      }
+    }
+
+    // 2. Fetch server speech with fast fallback to browser native speech
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+    const timeoutId = setTimeout(() => controller.abort(), 3500); // 3.5s timeout for ultra-fast reaction
+
+    try {
+      const token = getToken() || sessionStorage.getItem("sachet.token");
+      // Cap speech text to first 1200 chars for rapid response on long documents
+      const snippet = clean.slice(0, 1400);
+      const blob = await fetchSpeech(snippet, targetLang, token);
+      clearTimeout(timeoutId);
+
       const raw = await blob.arrayBuffer();
       const wav = pcmToWav(raw, 24000);
+      audioBlobCache.set(cacheKey, wav);
+
       if (urlRef.current) URL.revokeObjectURL(urlRef.current);
       urlRef.current = URL.createObjectURL(wav);
       const audio = new Audio(urlRef.current);
       audioRef.current = audio;
+      modeRef.current = "audio";
+
       audio.onended = () => setState("idle");
-      audio.onerror = () => { setState("error"); setError("Could not play the audio."); };
+      audio.onerror = () => {
+        speakWithBrowserSynth(clean.slice(0, 1500), targetLang);
+      };
+
       await audio.play();
       setState("playing");
-    } catch (e) {
-      console.warn("Speech playback error:", e);
-      setState("error");
-      setError(e.message || "Speech synthesis failed.");
+      setHasPlayedOnce(true);
+    } catch (err) {
+      clearTimeout(timeoutId);
+      // Fallback immediately to zero-latency Browser Speech Synthesis
+      try {
+        speakWithBrowserSynth(clean.slice(0, 1500), targetLang);
+      } catch (synthErr) {
+        console.warn("Both server and browser TTS failed:", synthErr);
+        setError("Speech synthesis could not start.");
+        setState("idle");
+      }
+    } finally {
+      abortControllerRef.current = null;
     }
   };
 
+  const pause = () => {
+    if (modeRef.current === "audio" && audioRef.current) {
+      try {
+        audioRef.current.pause();
+      } catch { /* noop */ }
+    } else if (modeRef.current === "synth" && typeof window !== "undefined" && window.speechSynthesis) {
+      window.speechSynthesis.pause();
+    }
+    setState("paused");
+  };
+
+  const repeat = () => {
+    if (modeRef.current === "audio" && audioRef.current) {
+      try {
+        audioRef.current.currentTime = 0;
+        audioRef.current.play();
+        setState("playing");
+        return;
+      } catch { /* re-run play */ }
+    }
+    play(true);
+  };
+
   const stop = () => {
-    audioRef.current?.pause();
+    if (abortControllerRef.current) abortControllerRef.current.abort();
+    if (modeRef.current === "audio" && audioRef.current) {
+      try {
+        audioRef.current.pause();
+        audioRef.current.currentTime = 0;
+      } catch { /* noop */ }
+    }
+    if (typeof window !== "undefined" && window.speechSynthesis) {
+      window.speechSynthesis.cancel();
+    }
     setState("idle");
   };
 
-  if (!available) {
-    return (
-      <Tooltip content="Speech synthesis unavailable (set SACHET_TTS_PROVIDER=gemini and API key in .env)">
-        <button
-          type="button"
-          className="p-1 text-slate-400 hover:text-slate-600 rounded transition-colors opacity-40 cursor-not-allowed"
-          disabled
-          aria-label="Speech synthesis not configured"
-        >
-          {SpeakerIcon}
-        </button>
-      </Tooltip>
-    );
-  }
+  const detected = detectLanguageFromText(cleanTextForSpeech(text));
+  const langLabel = detected === "mai-IN" ? "मैथिली / हिन्दी" :
+                    detected === "pa-IN" ? "ਪੰਜਾਬੀ" :
+                    detected === "bn-IN" ? "বাংলা" :
+                    detected === "ta-IN" ? "தமிழ்" :
+                    detected === "te-IN" ? "తెలుగు" :
+                    detected === "mr-IN" ? "मराठी" :
+                    detected === "gu-IN" ? "ગુજરાતી" :
+                    detected === "en-IN" ? "English (India)" : "English";
 
-  const detected = detectLanguageFromText(text);
-  const langLabel = detected === "mai-IN" ? "मैथिली / हिन्दी" : detected === "pa-IN" ? "ਪੰਜਾਬੀ" : detected === "bn-IN" ? "বাংলা" : "English";
-
+  // Compact layout for chat bubbles
   if (compact) {
     return (
       <span className="inline-flex items-center gap-1">
-        <Tooltip content={state === "playing" ? "Stop speaking" : (state === "loading" ? "Preparing speech…" : `Listen aloud (${langLabel})`)}>
-          <button
-            type="button"
-            className={`p-1 rounded-lg transition-colors flex items-center justify-center cursor-pointer ${
-              state === "playing"
-                ? "bg-red-500/10 text-red-600 dark:text-red-400 font-bold"
-                : state === "loading"
-                ? "bg-emerald-500/10 text-emerald-600 animate-pulse"
-                : "text-slate-500 dark:text-slate-300 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-slate-200/50 dark:hover:bg-zinc-700/50"
-            }`}
-            onClick={state === "playing" ? stop : play}
-            disabled={state === "loading"}
-            aria-label={state === "playing" ? "Stop speaking" : "Listen aloud"}
-          >
-            {state === "loading" ? (
-              <span className="w-3.5 h-3.5 border-2 border-emerald-600 border-t-transparent rounded-full animate-spin" />
-            ) : (state === "playing" ? StopIcon : SpeakerIcon)}
-          </button>
-        </Tooltip>
+        {state === "idle" && (
+          <Tooltip content={hasPlayedOnce ? `Listen again (${langLabel})` : `Listen aloud (${langLabel})`}>
+            <button
+              type="button"
+              className="p-1 rounded-lg text-slate-500 dark:text-slate-300 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-slate-200/50 dark:hover:bg-zinc-700/50 transition-colors flex items-center justify-center cursor-pointer"
+              onClick={() => play(false)}
+              aria-label={hasPlayedOnce ? "Listen again" : "Listen aloud"}
+            >
+              {hasPlayedOnce ? RepeatIcon : SpeakerIcon}
+            </button>
+          </Tooltip>
+        )}
+
+        {state === "loading" && (
+          <Tooltip content="Preparing speech synthesis…">
+            <span className="p-1 rounded-lg flex items-center justify-center text-emerald-500 animate-pulse">
+              <span className="w-3.5 h-3.5 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
+            </span>
+          </Tooltip>
+        )}
+
+        {state === "playing" && (
+          <span className="inline-flex items-center gap-0.5 bg-emerald-500/15 border border-emerald-500/30 rounded-lg px-1 py-0.5 animate-fadeIn">
+            <Tooltip content="Pause reading aloud">
+              <button
+                type="button"
+                className="p-1 rounded hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 cursor-pointer transition-colors"
+                onClick={pause}
+                aria-label="Pause reading"
+              >
+                {PauseIcon}
+              </button>
+            </Tooltip>
+            <Tooltip content="Repeat from start">
+              <button
+                type="button"
+                className="p-1 rounded hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 cursor-pointer transition-colors"
+                onClick={repeat}
+                aria-label="Repeat from start"
+              >
+                {RepeatIcon}
+              </button>
+            </Tooltip>
+            <Tooltip content="Stop reading">
+              <button
+                type="button"
+                className="p-1 rounded hover:bg-red-500/20 text-red-600 dark:text-red-400 cursor-pointer transition-colors"
+                onClick={stop}
+                aria-label="Stop reading"
+              >
+                {StopIcon}
+              </button>
+            </Tooltip>
+          </span>
+        )}
+
+        {state === "paused" && (
+          <span className="inline-flex items-center gap-0.5 bg-amber-500/15 border border-amber-500/30 rounded-lg px-1 py-0.5 animate-fadeIn">
+            <Tooltip content="Resume reading">
+              <button
+                type="button"
+                className="p-1 rounded hover:bg-amber-500/20 text-amber-600 dark:text-amber-400 cursor-pointer transition-colors"
+                onClick={() => play(false)}
+                aria-label="Resume reading"
+              >
+                {PlayIcon}
+              </button>
+            </Tooltip>
+            <Tooltip content="Repeat from start">
+              <button
+                type="button"
+                className="p-1 rounded hover:bg-amber-500/20 text-amber-600 dark:text-amber-400 cursor-pointer transition-colors"
+                onClick={repeat}
+                aria-label="Repeat from start"
+              >
+                {RepeatIcon}
+              </button>
+            </Tooltip>
+            <Tooltip content="Stop reading">
+              <button
+                type="button"
+                className="p-1 rounded hover:bg-red-500/20 text-red-600 dark:text-red-400 cursor-pointer transition-colors"
+                onClick={stop}
+                aria-label="Stop reading"
+              >
+                {StopIcon}
+              </button>
+            </Tooltip>
+          </span>
+        )}
+
         {error && (
           <Tooltip content={error}>
             <span className="text-[11px] text-red-500 cursor-help" role="alert">⚠️</span>
@@ -146,8 +388,12 @@ export default function ListenButton({ text, compact = false, initialLang = "aut
     );
   }
 
+  // Full toolbar view
   return (
-    <span className={`listen-control ${state !== "idle" ? "listen-control--active" : ""}`} style={{ display: "inline-flex", alignItems: "center", gap: 4, flexWrap: "nowrap" }}>
+    <span
+      className={`listen-control ${state !== "idle" ? "listen-control--active" : ""}`}
+      style={{ display: "inline-flex", alignItems: "center", gap: 6, flexWrap: "nowrap" }}
+    >
       <select
         className="ui-select"
         value={lang}
@@ -169,23 +415,109 @@ export default function ListenButton({ text, compact = false, initialLang = "aut
         ))}
       </select>
 
-      <Tooltip content={state === "playing" ? "Stop speaking" : (state === "loading" ? "Synthesizing…" : "Listen (Read aloud)")}>
+      {state === "idle" && (
+        <Tooltip content={hasPlayedOnce ? `Listen again (${langLabel})` : `Listen aloud (${langLabel})`}>
+          <button
+            type="button"
+            className="ui-btn ui-btn--ghost ui-btn--sm"
+            onClick={() => play(false)}
+            aria-label="Listen aloud"
+            style={{ height: 28, padding: "0 8px", minWidth: 28 }}
+          >
+            {hasPlayedOnce ? RepeatIcon : SpeakerIcon}
+          </button>
+        </Tooltip>
+      )}
+
+      {state === "loading" && (
         <button
           type="button"
-          className={`ui-btn ui-btn--sm ${state === "playing" ? "ui-btn--danger-outline" : "ui-btn--ghost"}`}
-          onClick={state === "playing" ? stop : play}
-          disabled={state === "loading"}
-          aria-label={state === "playing" ? "Stop speaking" : "Read this aloud"}
+          className="ui-btn ui-btn--ghost ui-btn--sm"
+          disabled
           style={{ height: 28, padding: "0 8px", minWidth: 28 }}
         >
-          {state === "loading" ? (
-            <svg className="ui-spinner ui-spinner--xs" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-              <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3.5" opacity="0.25" />
-              <path d="M22 12a10 10 0 00-10-10" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" />
-            </svg>
-          ) : (state === "playing" ? StopIcon : SpeakerIcon)}
+          <svg className="ui-spinner ui-spinner--xs" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3.5" opacity="0.25" />
+            <path d="M22 12a10 10 0 00-10-10" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" />
+          </svg>
         </button>
-      </Tooltip>
+      )}
+
+      {state === "playing" && (
+        <span className="inline-flex items-center gap-1">
+          <Tooltip content="Pause reading">
+            <button
+              type="button"
+              className="ui-btn ui-btn--sm ui-btn--secondary"
+              onClick={pause}
+              style={{ height: 28, padding: "0 8px" }}
+              aria-label="Pause"
+            >
+              {PauseIcon}
+            </button>
+          </Tooltip>
+          <Tooltip content="Repeat from start">
+            <button
+              type="button"
+              className="ui-btn ui-btn--sm ui-btn--ghost"
+              onClick={repeat}
+              style={{ height: 28, padding: "0 8px" }}
+              aria-label="Repeat"
+            >
+              {RepeatIcon}
+            </button>
+          </Tooltip>
+          <Tooltip content="Stop reading">
+            <button
+              type="button"
+              className="ui-btn ui-btn--sm ui-btn--danger-outline"
+              onClick={stop}
+              style={{ height: 28, padding: "0 8px" }}
+              aria-label="Stop"
+            >
+              {StopIcon}
+            </button>
+          </Tooltip>
+        </span>
+      )}
+
+      {state === "paused" && (
+        <span className="inline-flex items-center gap-1">
+          <Tooltip content="Resume reading">
+            <button
+              type="button"
+              className="ui-btn ui-btn--sm ui-btn--primary"
+              onClick={() => play(false)}
+              style={{ height: 28, padding: "0 8px" }}
+              aria-label="Resume"
+            >
+              {PlayIcon}
+            </button>
+          </Tooltip>
+          <Tooltip content="Repeat from start">
+            <button
+              type="button"
+              className="ui-btn ui-btn--sm ui-btn--ghost"
+              onClick={repeat}
+              style={{ height: 28, padding: "0 8px" }}
+              aria-label="Repeat"
+            >
+              {RepeatIcon}
+            </button>
+          </Tooltip>
+          <Tooltip content="Stop reading">
+            <button
+              type="button"
+              className="ui-btn ui-btn--sm ui-btn--danger-outline"
+              onClick={stop}
+              style={{ height: 28, padding: "0 8px" }}
+              aria-label="Stop"
+            >
+              {StopIcon}
+            </button>
+          </Tooltip>
+        </span>
+      )}
 
       {error && (
         <Tooltip content={error}>

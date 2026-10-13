@@ -142,9 +142,13 @@ public class GeminiTtsProvider implements TtsProvider {
       } catch (IllegalStateException | IllegalArgumentException e) {
         throw e;
       } catch (RuntimeException e) {
-        log.warn("Gemini TTS with model {} failed ({}). Trying next candidate.",
+        log.warn("Gemini TTS with model {} failed ({}).",
             targetModel, e.getMessage());
         lastException = e;
+        if (e.getMessage() != null && e.getMessage().contains("429")) {
+          // Break immediately on quota exhaustion so frontend falls back instantly
+          break;
+        }
       }
     }
 

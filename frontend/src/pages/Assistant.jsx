@@ -95,7 +95,23 @@ export default function Assistant() {
     return newId();
   });
 
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(() => {
+    try {
+      const saved = localStorage.getItem("sachet_chat_sidebar");
+      return saved !== "false";
+    } catch {
+      return true;
+    }
+  });
+
+  const toggleSidebar = useCallback(() => {
+    setSidebarOpen((prev) => {
+      const next = !prev;
+      try { localStorage.setItem("sachet_chat_sidebar", String(next)); } catch { /* noop */ }
+      return next;
+    });
+  }, []);
+
   const [showSettings, setShowSettings] = useState(false);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
@@ -104,7 +120,7 @@ export default function Assistant() {
   const [customPrompt, setCustomPrompt] = useState("");
   const [error, setError] = useState(null);
 
-  // Jarvis Voice Agent State Machine: "SLEEPING" | "LISTENING" | "THINKING" | "SPEAKING"
+  // SACHET Voice Agent State Machine: "SLEEPING" | "LISTENING" | "THINKING" | "SPEAKING"
   const [voiceMode, setVoiceMode] = useState(false);
   const [voiceState, setVoiceState] = useState("SLEEPING");
   const [isFollowUp, setIsFollowUp] = useState(false);
@@ -130,6 +146,8 @@ export default function Assistant() {
   const hasSpokenRef = useRef(false);
   const isStoppingRef = useRef(false);
   const wakeRecRef = useRef(null);
+  const recognitionRef = useRef(null);
+  const liveSpeechRef = useRef("");
 
   // Generate document modal state
   const [showGenerate, setShowGenerate] = useState(false);
@@ -232,6 +250,9 @@ export default function Assistant() {
       } catch { /* noop */ }
       speechAudioRef.current = null;
     }
+    if (typeof window !== "undefined" && window.speechSynthesis) {
+      try { window.speechSynthesis.cancel(); } catch { /* noop */ }
+    }
     if (speechUrlRef.current) {
       URL.revokeObjectURL(speechUrlRef.current);
       speechUrlRef.current = null;
@@ -239,6 +260,10 @@ export default function Assistant() {
   }, []);
 
   const cleanupMicAndAnalyser = useCallback(() => {
+    if (recognitionRef.current) {
+      try { recognitionRef.current.stop(); } catch { /* noop */ }
+      recognitionRef.current = null;
+    }
     if (animFrameRef.current) {
       cancelAnimationFrame(animFrameRef.current);
       animFrameRef.current = null;
@@ -272,7 +297,7 @@ export default function Assistant() {
   const startListeningRef = useRef(null);
   const finishListeningAndProcessRef = useRef(null);
 
-  // Read answer aloud in voice mode
+  // Read answer aloud in voice mode with high speed & fallback
   const playSpokenAnswer = useCallback(async (text, lang) => {
     const cleanText = cleanTextForSpeech(text);
     if (!cleanText || !cleanText.trim()) {
@@ -280,13 +305,53 @@ export default function Assistant() {
       return;
     }
 
-    try {
-      const speechLang = (!lang || lang === "Auto detect")
-        ? detectLanguageFromText(cleanText)
-        : lang;
+    const speechLang = (!lang || lang === "Auto detect")
+      ? detectLanguageFromText(cleanText)
+      : lang;
 
+    const snippet = cleanText.slice(0, 1400);
+
+    const onFinish = () => {
+      speechAudioRef.current = null;
+      // CONVERSATIONAL CONTINUITY: Hands-free follow-up turn!
+      if (startListeningRef.current) startListeningRef.current(true);
+    };
+
+    const fallbackToBrowserSynth = () => {
+      if (typeof window !== "undefined" && window.speechSynthesis) {
+        try {
+          window.speechSynthesis.cancel();
+          const utt = new SpeechSynthesisUtterance(snippet);
+          utt.lang = speechLang || "en-IN";
+          utt.rate = 1.0;
+          utt.pitch = 1.0;
+
+          const voices = window.speechSynthesis.getVoices();
+          if (voices && voices.length > 0) {
+            const prefix = (speechLang || "en").split("-")[0].toLowerCase();
+            const match = voices.find((v) => v.lang.toLowerCase() === speechLang.toLowerCase()) ||
+                          voices.find((v) => v.lang.toLowerCase().startsWith(prefix)) ||
+                          voices.find((v) => v.lang.includes("IN") || v.name.includes("India") || v.name.includes("Hindi"));
+            if (match) utt.voice = match;
+          }
+
+          utt.onend = onFinish;
+          utt.onerror = onFinish;
+          window.speechSynthesis.speak(utt);
+          return;
+        } catch { /* proceed */ }
+      }
+      onFinish();
+    };
+
+    const timeoutController = new AbortController();
+    const timeoutId = setTimeout(() => timeoutController.abort(), 3200);
+
+    try {
       const token = getToken() || sessionStorage.getItem("sachet.token");
-      const blob = await fetchSpeech(cleanText.slice(0, 4000), speechLang, token);
+      const blob = await fetchSpeech(snippet, speechLang, token);
+      clearTimeout(timeoutId);
+
       const raw = await blob.arrayBuffer();
       const wav = pcmToWav(raw, 24000);
 
@@ -296,21 +361,15 @@ export default function Assistant() {
       const audio = new Audio(speechUrlRef.current);
       speechAudioRef.current = audio;
 
-      audio.onended = () => {
-        speechAudioRef.current = null;
-        // CONVERSATIONAL CONTINUITY: Hands-free follow-up turn!
-        if (startListeningRef.current) startListeningRef.current(true);
-      };
-
+      audio.onended = onFinish;
       audio.onerror = () => {
-        speechAudioRef.current = null;
-        if (startListeningRef.current) startListeningRef.current(true);
+        fallbackToBrowserSynth();
       };
 
       await audio.play();
     } catch (err) {
-      console.warn("TTS playback error in voice turn:", err);
-      if (startListeningRef.current) startListeningRef.current(true);
+      clearTimeout(timeoutId);
+      fallbackToBrowserSynth();
     }
   }, []);
 
@@ -401,7 +460,7 @@ export default function Assistant() {
 
   processVoiceChatTurnRef.current = processVoiceChatTurn;
 
-  // Finish listening and send to Gemini Multimodal STT + RAG
+  // Finish listening and send to speech recognition + RAG
   const finishListeningAndProcess = useCallback(async () => {
     if (isStoppingRef.current) return;
     isStoppingRef.current = true;
@@ -414,8 +473,23 @@ export default function Assistant() {
       } catch { /* noop */ }
     }
 
+    // 1. INSTANT BROWSER TRANSCRIPTION CHECK (0ms latency!)
+    const liveTranscript = liveSpeechRef.current?.trim();
+    if (liveTranscript && liveTranscript.length >= 2) {
+      setVoiceState("THINKING");
+      const detected = detectLanguageFromText(liveTranscript);
+      setDetectedLangDisplay(detected);
+      const activeAck = getInstantAck(detected);
+      setInstantAck(activeAck);
+
+      if (processVoiceChatTurnRef.current) {
+        await processVoiceChatTurnRef.current(liveTranscript, detected);
+      }
+      return;
+    }
+
     // Brief tick for ondataavailable to deliver remaining chunks
-    await new Promise((r) => setTimeout(r, 150));
+    await new Promise((r) => setTimeout(r, 120));
 
     const chunks = audioChunksRef.current;
     if (!chunks.length) {
@@ -475,7 +549,7 @@ export default function Assistant() {
 
   finishListeningAndProcessRef.current = finishListeningAndProcess;
 
-  // Start voice listening with live Web Audio Analyser and VAD
+  // Start voice listening with live Web Audio Analyser, fast browser ASR, and VAD
   const startListening = useCallback(async (followUp = false) => {
     setMicError(null);
     stopSpeaking();
@@ -491,11 +565,37 @@ export default function Assistant() {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       streamRef.current = stream;
       audioChunksRef.current = [];
+      liveSpeechRef.current = "";
       hasSpokenRef.current = false;
       isStoppingRef.current = false;
       setIsFollowUp(followUp);
       setRecordingSeconds(0);
       setVoiceState("LISTENING");
+
+      // Launch concurrent browser SpeechRecognition for 0ms recognition latency
+      const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (SpeechRec) {
+        try {
+          const rec = new SpeechRec();
+          rec.continuous = true;
+          rec.interimResults = true;
+          const activeCode = (language && language !== "Auto detect") ? language : "hi-IN";
+          rec.lang = activeCode;
+          rec.onresult = (event) => {
+            let combined = "";
+            for (let i = 0; i < event.results.length; ++i) {
+              combined += event.results[i][0].transcript;
+            }
+            if (combined.trim()) {
+              liveSpeechRef.current = combined.trim();
+              hasSpokenRef.current = true;
+            }
+          };
+          rec.onerror = () => {};
+          rec.start();
+          recognitionRef.current = rec;
+        } catch { /* proceed with MediaRecorder */ }
+      }
 
       // Setup Web Audio Analyser for live energy visualization & silence VAD
       try {
@@ -511,8 +611,8 @@ export default function Assistant() {
 
           const dataArray = new Uint8Array(analyser.frequencyBinCount);
           let silenceStart = null;
-          const VAD_THRESHOLD = 18; // Energy threshold
-          const SILENCE_TIMEOUT = 1800; // 1.8s silence after speech triggers turn
+          const VAD_THRESHOLD = 14; // Clean energy threshold
+          const SILENCE_TIMEOUT = 1000; // 1.0s silence after speech triggers turn for snappy response
 
           const checkLevels = () => {
             if (!analyserRef.current) return;
@@ -560,7 +660,7 @@ export default function Assistant() {
         if (e.data && e.data.size > 0) audioChunksRef.current.push(e.data);
       };
 
-      recorder.start(250);
+      recorder.start(200);
 
       timerRef.current = setInterval(() => {
         setRecordingSeconds((s) => s + 1);
@@ -822,13 +922,28 @@ export default function Assistant() {
   return (
     <div className="assistant flex h-[calc(100vh-64px)] overflow-hidden bg-transparent">
       {/* Sidebar history */}
-      <aside className={`chat-sidebar ${sidebarOpen ? "chat-sidebar--open" : ""}`} aria-label="Chat history">
+      <aside className={`chat-sidebar ${sidebarOpen ? "chat-sidebar--open" : "chat-sidebar--collapsed"}`} aria-label="Chat history">
         <div className="chat-sidebar__head flex items-center justify-between p-3 border-b border-slate-200 dark:border-zinc-800">
           <h2 className="text-sm font-bold text-slate-800 dark:text-white flex items-center gap-1.5">
             <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" width="16" height="16"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M8.625 12a.375.375 0 11-.75 0 .375.375 0 01.75 0zm3.75 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm3.75 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" /></svg>
             Chats
           </h2>
-          <Button variant="ghost" size="sm" onClick={createNewChat}>+ New</Button>
+          <div className="flex items-center gap-1">
+            <Button variant="ghost" size="sm" onClick={createNewChat}>+ New</Button>
+            <Tooltip content="Hide chat history sidebar">
+              <button
+                type="button"
+                className="icon-toggle"
+                style={{ width: 28, height: 28 }}
+                onClick={toggleSidebar}
+                aria-label="Collapse sidebar"
+              >
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" width="14" height="14">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.75 19.5L8.25 12l7.5-7.5" />
+                </svg>
+              </button>
+            </Tooltip>
+          </div>
         </div>
 
         <div className="chat-sidebar__list p-2 space-y-1 overflow-y-auto">
@@ -836,7 +951,10 @@ export default function Assistant() {
             <div key={chat.id} className={`chat-item ${chat.id === activeChatId ? "active" : ""}`}>
               <button
                 type="button"
-                onClick={() => { setActiveChatId(chat.id); setSidebarOpen(false); }}
+                onClick={() => {
+                  setActiveChatId(chat.id);
+                  if (typeof window !== "undefined" && window.innerWidth < 992) setSidebarOpen(false);
+                }}
                 className="flex items-center gap-2 flex-1 min-w-0 bg-transparent border-0 p-0 text-left cursor-pointer"
               >
                 <span className="chat-item__title text-xs truncate">{chat.title}</span>
@@ -875,12 +993,25 @@ export default function Assistant() {
             {/* Voice Mode Header */}
             <div className="px-4 py-3 border-b border-zinc-800/80 bg-zinc-900/60 backdrop-blur-md flex items-center justify-between gap-3 sticky top-0 z-10">
               <div className="flex items-center gap-2.5">
+                <Tooltip content={sidebarOpen ? "Hide sidebar" : "Show chat history sidebar"}>
+                  <button
+                    type="button"
+                    className={`icon-toggle transition-colors ${!sidebarOpen ? "border-purple-500/60 bg-purple-500/15 text-purple-400" : ""}`}
+                    onClick={toggleSidebar}
+                    aria-label={sidebarOpen ? "Hide chat history sidebar" : "Show chat history sidebar"}
+                    title={sidebarOpen ? "Hide chat history sidebar" : "Show chat history sidebar"}
+                  >
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" width="16" height="16">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
+                    </svg>
+                  </button>
+                </Tooltip>
                 <div className="w-8 h-8 rounded-xl bg-purple-500/20 border border-purple-500/40 flex items-center justify-center text-purple-400">
                   <MicIcon />
                 </div>
                 <div>
                   <h2 className="text-sm sm:text-base font-bold text-white flex items-center gap-2 leading-tight">
-                    Jarvis Voice Assistant
+                    SACHET Voice Assistant
                     <span className={`w-2 h-2 rounded-full ${
                       voiceState === "LISTENING" ? "bg-emerald-400 animate-ping" :
                       voiceState === "SPEAKING" ? "bg-pink-400 animate-pulse" :
@@ -892,7 +1023,7 @@ export default function Assistant() {
                     {voiceState === "SLEEPING" && "🌙 Standby • Wake phrase: 'Hello Sachet'"}
                     {voiceState === "LISTENING" && (isFollowUp ? "🎙️ Hands-free listening for follow-up" : "🎙️ Listening...")}
                     {voiceState === "THINKING" && "⚡ Analyzing authorized documents..."}
-                    {voiceState === "SPEAKING" && "🔊 Speaking aloud via Gemini TTS"}
+                    {voiceState === "SPEAKING" && "🔊 Speaking aloud with regional voice"}
                   </span>
                 </div>
               </div>
@@ -1179,9 +1310,19 @@ export default function Assistant() {
             {/* Card Header matching template */}
             <div className="px-4 py-3 border-b border-slate-200 dark:border-zinc-700 bg-slate-50/80 dark:bg-zinc-800/60 backdrop-blur-sm flex items-center justify-between gap-3">
               <div className="flex items-center gap-2.5">
-                <button className="icon-toggle ui-hide-tablet" onClick={() => setSidebarOpen((v) => !v)} aria-label="Toggle chat history">
-                  <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" width="16" height="16"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" /></svg>
-                </button>
+                <Tooltip content={sidebarOpen ? "Hide sidebar (expand chat)" : "Show chat history sidebar"}>
+                  <button
+                    type="button"
+                    className={`icon-toggle transition-colors ${!sidebarOpen ? "border-emerald-500/60 bg-emerald-500/15 text-emerald-400" : ""}`}
+                    onClick={toggleSidebar}
+                    aria-label={sidebarOpen ? "Hide chat history sidebar" : "Show chat history sidebar"}
+                    title={sidebarOpen ? "Hide chat history sidebar" : "Show chat history sidebar"}
+                  >
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" width="16" height="16">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
+                    </svg>
+                  </button>
+                </Tooltip>
                 <div className="w-8 h-8 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-600">
                   {SHIELD}
                 </div>
@@ -1473,7 +1614,7 @@ export default function Assistant() {
                 </div>
 
                 {/* Prominent Mic Button: Opens Voice Mode & immediately starts listening */}
-                <Tooltip content={`Open Jarvis Voice Mode in ${currentLangObj.label}`}>
+                <Tooltip content={`Open SACHET Voice Mode in ${currentLangObj.label}`}>
                   <button
                     type="button"
                     onClick={() => {

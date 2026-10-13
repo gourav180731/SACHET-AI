@@ -2,6 +2,7 @@ package ai.sachet.voice;
 
 import ai.sachet.config.SachetProperties;
 import com.google.genai.Client;
+import com.google.genai.types.GenerateContentConfig;
 import com.google.genai.types.GenerateContentResponse;
 import com.google.genai.types.Part;
 import java.util.List;
@@ -127,10 +128,15 @@ public class GeminiSttProvider implements SttProvider {
         Part audioPart = Part.fromBytes(audioBytes, cleanMime);
         Part textPart = Part.fromText(prompt);
 
+        GenerateContentConfig cfg = GenerateContentConfig.builder()
+            .temperature(0.1f)
+            .maxOutputTokens(300)
+            .build();
+
         GenerateContentResponse res = client.models.generateContent(
             targetModel,
             com.google.genai.types.Content.fromParts(audioPart, textPart),
-            null);
+            cfg);
 
         String raw = res.text();
         if (raw == null) raw = "";
