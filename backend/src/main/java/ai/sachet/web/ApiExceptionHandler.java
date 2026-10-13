@@ -92,6 +92,12 @@ public class ApiExceptionHandler {
     return envelope(HttpStatus.CONFLICT, e.getMessage(), req, false);
   }
 
+  @ExceptionHandler(org.springframework.web.multipart.MaxUploadSizeExceededException.class)
+  public ResponseEntity<Map<String, Object>> maxUpload(
+      org.springframework.web.multipart.MaxUploadSizeExceededException e, HttpServletRequest req) {
+    return envelope(HttpStatus.PAYLOAD_TOO_LARGE, "File exceeds maximum upload size limit (100MB).", req, false);
+  }
+
   @ExceptionHandler(ai.sachet.rag.EmbeddingUnavailableException.class)
   public ResponseEntity<Map<String, Object>> embeddingDown(
       ai.sachet.rag.EmbeddingUnavailableException e, HttpServletRequest req) {

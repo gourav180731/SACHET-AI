@@ -3,6 +3,9 @@
 # or standard Spring names. Secrets come from env/vault — never this file.
 server:
   port: 8000
+  tomcat:
+    max-swallow-size: -1
+    max-http-form-post-size: 104857600
 
 sachet:
   app-env: ${SACHET_APP_ENV:dev}
@@ -66,6 +69,11 @@ sachet:
   audio-frame-millis: ${SACHET_AUDIO_FRAME_MILLIS:100}
 
 spring:
+  servlet:
+    multipart:
+      enabled: true
+      max-file-size: 100MB
+      max-request-size: 100MB
   datasource:
     url: ${SACHET_DATABASE_URL:jdbc:postgresql://localhost:5432/SACHET_AI?user=postgres&password=admin}
     username: ${SACHET_DB_USER:postgres}

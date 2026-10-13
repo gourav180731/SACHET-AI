@@ -27,8 +27,11 @@ export async function apiFetch(path, { method = "GET", body, formData } = {}) {
       headers,
       body: formData ?? (body !== undefined ? JSON.stringify(body) : undefined),
     });
-  } catch {
-    throw new ApiError(0, "NETWORK", "SACHET AI service is temporarily unavailable.");
+  } catch (err) {
+    const errorMsg = err?.message && !err.message.includes("Failed to fetch")
+      ? `Network request failed: ${err.message}`
+      : "Connection interrupted or file upload exceeded limits. Verify server connection.";
+    throw new ApiError(0, "NETWORK", errorMsg);
   }
   if (res.status === 401) {
     window.dispatchEvent(new Event("sachet:unauthorized"));
@@ -52,8 +55,8 @@ export async function apiDownload(path, filename) {
   let res;
   try {
     res = await fetch(`${API_BASE}${path}`, { headers });
-  } catch {
-    throw new ApiError(0, "NETWORK", "SACHET AI service is temporarily unavailable.");
+  } catch (err) {
+    throw new ApiError(0, "NETWORK", "Download connection failed or server unreachable.");
   }
   if (res.status === 401) {
     window.dispatchEvent(new Event("sachet:unauthorized"));
@@ -86,8 +89,8 @@ export async function* fetchWithStream(path, { method = "POST", body } = {}) {
   let res;
   try {
     res = await fetch(`${API_BASE}${path}`, { method, headers, body: JSON.stringify(body) });
-  } catch {
-    throw new ApiError(0, "NETWORK", "SACHET AI service is temporarily unavailable.");
+  } catch (err) {
+    throw new ApiError(0, "NETWORK", "Connection error during stream. Server unreachable.");
   }
   
   if (res.status === 401) {

@@ -70,7 +70,7 @@ public class AuthService {
     if (user == null) {
       String randomSecret = UUID.randomUUID().toString();
       user = new User(normalizedEmail, passwords.hash(randomSecret));
-      user.setClearance(Classification.INTERNAL);
+      user.setClearance(Classification.SECRET);
       user.setDepartment("Operations");
       user.setActive(true);
 

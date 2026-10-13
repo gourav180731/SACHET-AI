@@ -180,15 +180,15 @@ export default function Login() {
 
       {/* Brand logo & header on top of form */}
       <div className="text-center mb-6 z-10 animate-fadeIn">
-        <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-zinc-950 border border-cyan-500/40 shadow-xl shadow-cyan-500/20 mb-3 relative overflow-hidden group">
+        <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-slate-950 border-2 border-amber-500/60 shadow-xl shadow-blue-900/40 mb-3 relative overflow-hidden group">
           <img
             src="/sachet-logo.jpg"
             alt="SACHET AI Official Emblem"
-            className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+            className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105 rounded-full"
           />
-          <span className="absolute top-1 right-1 flex h-3 w-3">
+          <span className="absolute top-0 right-1 flex h-3 w-3">
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-            <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500" />
+            <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500 border border-slate-950" />
           </span>
         </div>
         <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900 dark:text-white">
@@ -565,6 +565,30 @@ export default function Login() {
                 </div>
                 <span className="text-[10px] font-semibold uppercase px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
                   HQ Admin
+                </span>
+              </div>
+
+              {/* Quick option: Operations Officer Google SSO */}
+              <div
+                role="button"
+                tabIndex={0}
+                onClick={() => handleExecuteGoogleLogin("ops.officer@gmail.com", "Operations Officer")}
+                onKeyDown={(e) => e.key === "Enter" && handleExecuteGoogleLogin("ops.officer@gmail.com", "Operations Officer")}
+                className="flex items-center justify-between p-3.5 rounded-xl border border-slate-700/70 bg-zinc-900/80 hover:bg-zinc-800/80 hover:border-cyan-500/50 cursor-pointer transition-all duration-150 group"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-emerald-600 to-teal-500 flex items-center justify-center font-bold text-white text-sm shadow-md">
+                    OO
+                  </div>
+                  <div>
+                    <div className="text-sm font-semibold text-slate-100 group-hover:text-cyan-400 transition-colors">
+                      Operations Officer
+                    </div>
+                    <div className="text-xs text-slate-400">ops.officer@gmail.com</div>
+                  </div>
+                </div>
+                <span className="text-[10px] font-semibold uppercase px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-400 border border-cyan-500/30">
+                  Officer
                 </span>
               </div>
             </div>
