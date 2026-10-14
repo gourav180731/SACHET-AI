@@ -92,7 +92,7 @@ public class ChatService {
       } else {
         // Build RAG context for LLM
         String ragContext = buildRagContext(result.results());
-        String lang = language != null ? language : props.getDefaultRagMode();
+        String lang = resolveLanguage(req.query(), language);
         String mode = responseMode != null ? responseMode : props.getDefaultRagMode();
 
         try {
@@ -134,7 +134,7 @@ public class ChatService {
     }
 
     String ragContext = buildRagContext(result.results());
-    String lang = language != null ? language : "en-IN";
+    String lang = resolveLanguage(req.query(), language);
     String mode = responseMode != null ? responseMode : props.getDefaultRagMode();
 
     ModelGateway gateway = modelGatewayFactory.getGateway();
@@ -267,5 +267,91 @@ public class ChatService {
     }
 
     return sb.toString().trim();
+  }
+
+  /**
+   * Resolves the exact BCP-47 regional language tag.
+   * If the user selected an explicit regional language (not auto/en-IN), that is preserved.
+   * If the query is written in a regional script (Devanagari, Gurmukhi, Bengali, Tamil, etc.),
+   * the language is automatically resolved directly from the user's query text so that regional
+   * queries ALWAYS receive full responses in their authentic mother tongue.
+   */
+  public static String resolveLanguage(String query, String requestedLang) {
+    if (requestedLang != null && !requestedLang.isBlank()
+        && !"auto".equalsIgnoreCase(requestedLang)
+        && !"Auto detect".equalsIgnoreCase(requestedLang)
+        && !"en-IN".equalsIgnoreCase(requestedLang)
+        && !"en".equalsIgnoreCase(requestedLang)) {
+      return requestedLang;
+    }
+
+    if (query == null || query.isBlank()) {
+      return (requestedLang != null && !requestedLang.isBlank()
+          && !"auto".equalsIgnoreCase(requestedLang)
+          && !"Auto detect".equalsIgnoreCase(requestedLang))
+          ? requestedLang : "en-IN";
+    }
+
+    // Inspect query characters for regional scripts
+    for (int i = 0; i < query.length(); i++) {
+      char ch = query.charAt(i);
+      if (ch >= 0x0A00 && ch <= 0x0A7F) return "pa-IN"; // Gurmukhi (Punjabi)
+      if (ch >= 0x0980 && ch <= 0x09FF) return "bn-IN"; // Bengali / Assamese
+      if (ch >= 0x0B80 && ch <= 0x0BFF) return "ta-IN"; // Tamil
+      if (ch >= 0x0C00 && ch <= 0x0C7F) return "te-IN"; // Telugu
+      if (ch >= 0x0A80 && ch <= 0x0AFF) return "gu-IN"; // Gujarati
+      if (ch >= 0x0C80 && ch <= 0x0CFF) return "kn-IN"; // Kannada
+      if (ch >= 0x0D00 && ch <= 0x0D7F) return "ml-IN"; // Malayalam
+      if (ch >= 0x0600 && ch <= 0x06FF) return "ur-IN"; // Urdu
+      if (ch >= 0x0B00 && ch <= 0x0B7F) return "or-IN"; // Odia
+    }
+
+    // Check Devanagari script (0x0900 - 0x097F)
+    boolean hasDevanagari = false;
+    for (int i = 0; i < query.length(); i++) {
+      char ch = query.charAt(i);
+      if (ch >= 0x0900 && ch <= 0x097F) {
+        hasDevanagari = true;
+        break;
+      }
+    }
+
+    if (hasDevanagari) {
+      String lower = query.toLowerCase(Locale.ROOT);
+      // Maithili markers: authentic Mithila vocabulary and grammatical particles
+      String[] maithiliMarkers = {
+          "की हाल", "हाल चाल", "बढ़िया", "छै", "अछि", "दलोहान", "अहाँ", "हमर", "तोहर",
+          "कहल", "देल", "ओकरा", "एहि", "ओहि", "सभ", "सभटा", "बुझाइत", "नीचाँ", "सोझाँ",
+          "भेल", "भऽ", "रहल छी", "रहल अछि", "की अछि", "की भेल", "कहू", "बताउ", "बुझाउ",
+          "हमार", "देलियै", "कहलियै", "ब्यौरा", "सार", "केँ", "क'", "लेल", "सट्टा", "कएल",
+          "बला", "पठेबाक", "दुनू", "मैथिली", "मैथिल"
+      };
+      for (String m : maithiliMarkers) {
+        if (lower.contains(m)) return "mai-IN";
+      }
+
+      // Marathi markers
+      String[] marathiMarkers = {"आहे", "नाही", "कसे", "झाले", "करा", "माझे", "तुमचे", "काय", "आहेत", "मराठी"};
+      for (String m : marathiMarkers) {
+        if (lower.contains(m)) return "mr-IN";
+      }
+
+      // Hindi markers
+      String[] hindiMarkers = {"रहा है", "रही है", "रहे हैं", "क्या", "कैसे", "बताइए", "आपका", "हमारे", "होता है", "हिन्दी"};
+      for (String m : hindiMarkers) {
+        if (lower.contains(m)) return "hi-IN";
+      }
+
+      // Default Devanagari query: prioritize Maithili for authentic Mithila regional intelligence
+      return "mai-IN";
+    }
+
+    if (requestedLang != null && !requestedLang.isBlank()
+        && !"auto".equalsIgnoreCase(requestedLang)
+        && !"Auto detect".equalsIgnoreCase(requestedLang)) {
+      return requestedLang;
+    }
+
+    return "en-IN";
   }
 }

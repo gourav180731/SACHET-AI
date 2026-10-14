@@ -132,7 +132,14 @@ public class GeminiTtsProvider implements TtsProvider {
       try {
         GenerateContentConfig.Builder cfg = GenerateContentConfig.builder()
             .responseModalities("AUDIO")
-            .speechConfig(SpeechConfig.builder().languageCode(languageCode).build());
+            .speechConfig(SpeechConfig.builder()
+                .languageCode(languageCode)
+                .voiceConfig(com.google.genai.types.VoiceConfig.builder()
+                    .prebuiltVoiceConfig(com.google.genai.types.PrebuiltVoiceConfig.builder()
+                        .voiceName("Puck")
+                        .build())
+                    .build())
+                .build());
 
         GenerateContentResponse res =
             client.models.generateContent(targetModel, com.google.genai.types.Content.fromParts(

@@ -81,9 +81,10 @@ export function detectLanguageFromText(text) {
     // Distinctive Maithili dialect vocabulary and verbal inflections
     const maithiliMarkers = [
       "की हाल", "हाल चाल", "बढ़िया", "छै", "अछि", "दलोहान", "अहाँ", "हमर", "तोहर",
-      "कहलहुं", "देलहुं", "ओकरा", "एहि", "ओहि", "सभ", "सभटा", "बुझाइत", "नीचाँ",
-      "सोझाँ", "भेल", "भऽ गेल", "कऽ कऽ", "रहल छी", "रहल अछि", "की अछि", "की भेल",
-      "कहू", "बताउ", "बुझाउ", "हमार", "देलियै", "कहलियै", "ब्यौरा", "सार"
+      "कहल", "देल", "ओकरा", "एहि", "ओहि", "सभ", "सभटा", "बुझाइत", "नीचाँ", "सोझाँ",
+      "भेल", "भऽ", "रहल छी", "रहल अछि", "की अछि", "की भेल", "कहू", "बताउ", "बुझाउ",
+      "हमार", "देलियै", "कहलियै", "ब्यौरा", "सार", "केँ", "क'", "लेल", "सट्टा", "कएल",
+      "बला", "पठेबाक", "दुनू", "मैथिली", "मैथिल"
     ];
     if (maithiliMarkers.some((m) => lower.includes(m))) {
       return "mai-IN";
@@ -291,12 +292,12 @@ export function resolveBrowserVoice(voices, cleanText, langTag) {
         !/english|david|zira|hazel|george|susan|mark|ravi|heera|neerja/i.test(v.name)
     );
 
-    // Prefer exact Hindi/Devanagari voices (e.g. Microsoft Hemant, Microsoft Kalpana, Google हिन्दी, Swara, Madhur)
+    // Prefer exact Hindi/Devanagari voices (e.g. Microsoft Hemant, Microsoft Kalpana, Google हिन्दी, Swara, Madhur, Manohar, Aarohi)
     const hindiVoice =
       nonEnglishVoices.find((v) => v.lang.toLowerCase() === "hi-in" || v.lang.toLowerCase().startsWith("hi")) ||
       nonEnglishVoices.find((v) => /hindi|हिन्दी|hemant|kalpana|swara|madhur|devanagari/i.test(v.name)) ||
       // Fallback to Marathi Devanagari voices
-      nonEnglishVoices.find((v) => v.lang.toLowerCase().startsWith("mr") || /marathi|मराठी/i.test(v.name)) ||
+      nonEnglishVoices.find((v) => v.lang.toLowerCase().startsWith("mr") || /marathi|मराठी|manohar|aarohi/i.test(v.name)) ||
       // Any voice whose name contains Hindi
       voices.find((v) => /hindi|हिन्दी|hemant|kalpana|swara|madhur/i.test(v.name));
 
@@ -307,7 +308,7 @@ export function resolveBrowserVoice(voices, cleanText, langTag) {
   if (isGurmukhi || (langTag && langTag.startsWith("pa"))) {
     const nonEnglish = voices.filter((v) => !v.lang.toLowerCase().startsWith("en"));
     const punjabiVoice =
-      nonEnglish.find((v) => v.lang.toLowerCase().startsWith("pa") || /punjabi|ਪੰਜਾਬੀ/i.test(v.name)) ||
+      nonEnglish.find((v) => v.lang.toLowerCase().startsWith("pa") || /punjabi|ਪੰਜਾਬੀ|raadhika/i.test(v.name)) ||
       // Fallback to Indian phonetic voice
       nonEnglish.find((v) => v.lang.toLowerCase().startsWith("hi") || /hindi|hemant|kalpana/i.test(v.name));
     if (punjabiVoice) return punjabiVoice;
@@ -317,7 +318,7 @@ export function resolveBrowserVoice(voices, cleanText, langTag) {
   if (isBengali || (langTag && langTag.startsWith("bn")) || (langTag && langTag.startsWith("as"))) {
     const nonEnglish = voices.filter((v) => !v.lang.toLowerCase().startsWith("en"));
     const bengaliVoice =
-      nonEnglish.find((v) => v.lang.toLowerCase().startsWith("bn") || /bengali|bangla|বাংলা/i.test(v.name)) ||
+      nonEnglish.find((v) => v.lang.toLowerCase().startsWith("bn") || /bengali|bangla|বাংলা|tanishaa|bashkar/i.test(v.name)) ||
       nonEnglish.find((v) => v.lang.toLowerCase().startsWith("as") || /assamese|অসমীয়া/i.test(v.name)) ||
       nonEnglish.find((v) => v.lang.toLowerCase().startsWith("hi") || /hindi|hemant|kalpana/i.test(v.name));
     if (bengaliVoice) return bengaliVoice;
@@ -327,7 +328,7 @@ export function resolveBrowserVoice(voices, cleanText, langTag) {
   if (isTamil || (langTag && langTag.startsWith("ta"))) {
     const nonEnglish = voices.filter((v) => !v.lang.toLowerCase().startsWith("en"));
     const tamilVoice =
-      nonEnglish.find((v) => v.lang.toLowerCase().startsWith("ta") || /tamil|தமிழ்/i.test(v.name)) ||
+      nonEnglish.find((v) => v.lang.toLowerCase().startsWith("ta") || /tamil|தமிழ்|valluvar|pallavi/i.test(v.name)) ||
       nonEnglish.find((v) => v.lang.toLowerCase().startsWith("hi") || /hindi|hemant|kalpana/i.test(v.name));
     if (tamilVoice) return tamilVoice;
   }
@@ -336,7 +337,7 @@ export function resolveBrowserVoice(voices, cleanText, langTag) {
   if (isTelugu || (langTag && langTag.startsWith("te"))) {
     const nonEnglish = voices.filter((v) => !v.lang.toLowerCase().startsWith("en"));
     const teluguVoice =
-      nonEnglish.find((v) => v.lang.toLowerCase().startsWith("te") || /telugu|తెలుగు/i.test(v.name)) ||
+      nonEnglish.find((v) => v.lang.toLowerCase().startsWith("te") || /telugu|తెలుగు|mohan|shruthi/i.test(v.name)) ||
       nonEnglish.find((v) => v.lang.toLowerCase().startsWith("hi") || /hindi|hemant|kalpana/i.test(v.name));
     if (teluguVoice) return teluguVoice;
   }
@@ -345,7 +346,7 @@ export function resolveBrowserVoice(voices, cleanText, langTag) {
   if (isGujarati || (langTag && langTag.startsWith("gu"))) {
     const nonEnglish = voices.filter((v) => !v.lang.toLowerCase().startsWith("en"));
     const gujaratiVoice =
-      nonEnglish.find((v) => v.lang.toLowerCase().startsWith("gu") || /gujarati|ગુજરાતી/i.test(v.name)) ||
+      nonEnglish.find((v) => v.lang.toLowerCase().startsWith("gu") || /gujarati|ગુજરાતી|dhwani|niranjan/i.test(v.name)) ||
       nonEnglish.find((v) => v.lang.toLowerCase().startsWith("hi") || /hindi|hemant|kalpana/i.test(v.name));
     if (gujaratiVoice) return gujaratiVoice;
   }
@@ -354,7 +355,7 @@ export function resolveBrowserVoice(voices, cleanText, langTag) {
   if (isKannada || (langTag && langTag.startsWith("kn"))) {
     const nonEnglish = voices.filter((v) => !v.lang.toLowerCase().startsWith("en"));
     const kannadaVoice =
-      nonEnglish.find((v) => v.lang.toLowerCase().startsWith("kn") || /kannada|ಕನ್ನಡ/i.test(v.name)) ||
+      nonEnglish.find((v) => v.lang.toLowerCase().startsWith("kn") || /kannada|ಕನ್ನಡ|gagan|sapna/i.test(v.name)) ||
       nonEnglish.find((v) => v.lang.toLowerCase().startsWith("hi") || /hindi|hemant|kalpana/i.test(v.name));
     if (kannadaVoice) return kannadaVoice;
   }
@@ -363,7 +364,7 @@ export function resolveBrowserVoice(voices, cleanText, langTag) {
   if (isMalayalam || (langTag && langTag.startsWith("ml"))) {
     const nonEnglish = voices.filter((v) => !v.lang.toLowerCase().startsWith("en"));
     const malayalamVoice =
-      nonEnglish.find((v) => v.lang.toLowerCase().startsWith("ml") || /malayalam|മലയാളം/i.test(v.name)) ||
+      nonEnglish.find((v) => v.lang.toLowerCase().startsWith("ml") || /malayalam|മലയാളം|sobhana|midhun/i.test(v.name)) ||
       nonEnglish.find((v) => v.lang.toLowerCase().startsWith("hi") || /hindi|hemant|kalpana/i.test(v.name));
     if (malayalamVoice) return malayalamVoice;
   }
@@ -372,15 +373,14 @@ export function resolveBrowserVoice(voices, cleanText, langTag) {
   if (isUrdu || (langTag && langTag.startsWith("ur"))) {
     const nonEnglish = voices.filter((v) => !v.lang.toLowerCase().startsWith("en"));
     const urduVoice =
-      nonEnglish.find((v) => v.lang.toLowerCase().startsWith("ur") || /urdu|اردو/i.test(v.name)) ||
+      nonEnglish.find((v) => v.lang.toLowerCase().startsWith("ur") || /urdu|اردو|gul|salman/i.test(v.name)) ||
       nonEnglish.find((v) => v.lang.toLowerCase().startsWith("hi") || /hindi|hemant|kalpana/i.test(v.name));
     if (urduVoice) return urduVoice;
   }
 
   // 10. NON-LATIN SCRIPT GUARD:
   // If text is in an Indian regional script and no dedicated voice exists,
-  // NEVER assign an English voice (David/Zira/etc.)! Returning null allows
-  // the browser/OS to select the native phonetic engine for utterance.lang.
+  // NEVER assign an English voice (David/Zira/etc.)!
   if (isDevanagari || isGurmukhi || isBengali || isTamil || isTelugu || isGujarati || isKannada || isMalayalam || isUrdu) {
     return null;
   }
@@ -398,6 +398,7 @@ export function resolveBrowserVoice(voices, cleanText, langTag) {
 /**
  * High-speed native browser speech synthesis execution.
  * Guarantees instantaneous audio start with correct regional phonetics.
+ * Strictly prevents English voice fallback when speaking regional languages.
  */
 export async function speakBrowserText(cleanSpeechText, langTag, options = {}) {
   const { onStart, onEnd, onError, rate = 1.0, pitch = 1.0 } = options;
@@ -410,9 +411,23 @@ export async function speakBrowserText(cleanSpeechText, langTag, options = {}) {
     window.speechSynthesis.cancel();
   } catch { /* noop */ }
 
+  const hasRegionalScript = Array.from(cleanSpeechText).some((ch) => {
+    const code = ch.charCodeAt(0);
+    return (code >= 0x0900 && code <= 0x0d7f) || (code >= 0x0600 && code <= 0x06ff);
+  });
+
   const voices = await getVoicesAsync();
   const phoneticLang = getBrowserPhoneticLang(cleanSpeechText, langTag);
   const voice = resolveBrowserVoice(voices, cleanSpeechText, langTag);
+
+  // STRICT SECURITY & AUTHENTICITY GUARD:
+  // If the text is in an Indian regional script and no regional voice is installed in the browser/OS,
+  // do NOT let the browser default to English (e.g. Microsoft David).
+  if (hasRegionalScript && !voice) {
+    throw new Error(
+      "No authentic regional voice is installed in your local browser for speech synthesis. An English voice will not be used."
+    );
+  }
 
   const utterance = new SpeechSynthesisUtterance(cleanSpeechText);
   utterance.rate = rate;

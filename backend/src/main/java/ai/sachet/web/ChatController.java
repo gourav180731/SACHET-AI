@@ -67,7 +67,7 @@ public class ChatController {
       @Valid @RequestBody ChatReq req) {
 
     String mode = req.responseMode() != null ? req.responseMode() : "detailed";
-    String lang = req.language() != null ? req.language() : "en-IN";
+    String lang = req.language();
     String customPrompt = req.customPrompt();
 
     return chatService.chatStream(principal, new ChatRequest(

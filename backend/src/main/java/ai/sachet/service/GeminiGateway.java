@@ -51,7 +51,7 @@ public class GeminiGateway implements ModelGateway {
     }
 
     String systemPrompt = buildSystemPrompt(language, responseMode, customPrompt);
-    String userPrompt = buildUserPrompt(query, ragContext);
+    String userPrompt = buildUserPrompt(query, ragContext, language);
 
     log.info("Generating grounded response for user {} in {} mode {}",
         principal.getUserId(), language, responseMode);
@@ -119,7 +119,7 @@ public class GeminiGateway implements ModelGateway {
     }
 
     String systemPrompt = buildSystemPrompt(language, responseMode, customPrompt);
-    String userPrompt = buildUserPrompt(query, ragContext);
+    String userPrompt = buildUserPrompt(query, ragContext, language);
 
     GenerateContentConfig config = GenerateContentConfig.builder()
         .temperature((float) props.getGeminiTemperature())
@@ -182,6 +182,7 @@ public class GeminiGateway implements ModelGateway {
     sb.append("2. If the context has insufficient supporting evidence, state clearly: \"I could not find sufficient supporting information in the authorized documents.\"\n");
     sb.append("3. Always cite sources inline using [doc:Title vX pY] format after key factual statements.\n");
     sb.append("4. Never fabricate citations or claim facts not supported by the document excerpts.\n");
+    sb.append("5. ABSOLUTE LANGUAGE RULE: When a regional language is requested or detected, write the ENTIRE response 100% in that regional language. Never switch back to English mid-response. Every paragraph, heading, bullet point, explanation, and conclusion must be purely in the target regional language. English is permitted ONLY inside parentheses for technical acronyms or entity names (e.g. C-DOT, PostGIS, TSP, SMSC, O(1) HashSet).\n");
 
     // Language handling & Native Cultural Style Guide
     sb.append("\n=======================================================\n");
@@ -238,99 +239,168 @@ public class GeminiGateway implements ModelGateway {
     String base = tag.split("-")[0].toLowerCase(java.util.Locale.ROOT);
     return switch (base) {
       case "mai" -> """
-          MAITHILI NATIVE HOME-FEEL DIRECTIVE (मैथिली भाषाक अपनत्व आ घरेलू मिठास):
-          - You MUST reply entirely in authentic, sweet, respectful Maithili (मैथिली) in Devanagari script.
-          - Speak exactly like a cultured, educated native Mithila person speaking warmly at home (मिथिलाक अपनत्व, मिठास आ आदर):
-            1. Warm native opening: e.g. "प्रणाम! सब किछ बढ़िया/कुशल-मंगल अछि। अहाँ जे दस्तावेज़/पीडीएफ देलहुं अछि, ओहि केर आधार पर सबटा मुख्य बात आ डेटा हम अहाँक सोझाँ राखि रहल छी:"
-            2. Respectful address: ALWAYS use 'अहाँ' / 'अहाँक' (never 'तूं').
-            3. Authentic grammar & verbal inflections:
-               - Use 'अछि' (is/are - polite/standard) or 'छै' (conversational), 'भऽ गेल अछि', 'देलहुं अछि', 'देखि सकैत छी', 'बुझाइत अछि', 'कहल गेल अछि'.
-               - Use authentic Maithili connectives: 'एहि में', 'ओहि में', 'सभटा', 'आब देखू', 'ओना तँ', 'बढ़िया बात ई अछि जे', 'सँ बढ़ि कऽ', 'जेना कि'.
-            4. Natural Section Headings (NEVER use stiff Hindi/Sanskrit translations like 'कार्यकारी सिंहावलोकन'):
-               - Use: '### १. दस्तावेज़क मुख्य सार (Executive Overview)'
-               - Use: '### २. विस्तृत मुख्य ब्यौरा आ डेटा (Detailed Findings)'
-               - Use: '### ३. मुख्य निष्कर्ष आ सुझाव (Key Insights)'
-            5. Keep telecom entities, company names, numbers, percentages, and citations intact: e.g. 'रिलायंस जियो (Reliance Jio): ४८.९४% [doc:trai data june 2026.pdf v1 p3]'.
-            6. Warm, hospitable closing: e.g. "जँ अहाँक एहि डेटा में कोनो विशेष बात वा सर्कल केर जानकारी चाही, तँ बेझिझक कहू, हम तुरंत बता देब।"
+          MAITHILI PURE REGIONAL INTELLIGENCE DIRECTIVE (शुद्ध, स्पष्ट आ प्रामाणिक मैथिली):
+          - You MUST reply entirely in pure, fluent, authentic Maithili (मैथिली) in Devanagari script.
+          - Speak with the genuine respect, sweetness, and depth of a native Mithila scholar/expert:
+            1. Standard opening line:
+               "प्रणाम। अहाँक निर्देशानुसार अधिकृत दस्तावेज़क आधारपर सम्पूर्ण विवरण केँ शुद्ध, स्पष्ट आ प्रामाणिक मैथिली भाषा मे विस्तार सँ नीचे प्रस्तुत क' रहल छी:"
+            2. Report Title:
+               # [दस्तावेज़क मुख्य विषय] प्रतिवेदन ([Subject] Report)
+            3. Standard Three-Part Section Hierarchy:
+               ### १. कार्यकारी अवलोकन (Executive Overview)
+               - Clear overview of the primary objective, deployment approach, and network architecture.
+               ### २. विस्तृत मुख्यनिष्कर्ष (Detailed Key Findings)
+               - Subsections formatted as:
+                 #### (क) [उप-विषय] ([English Title])
+                 #### (ख) [उप-विषय] ([English Title])
+                 #### (ग) [उप-विषय] ([English Title])
+                 #### (घ) [उप-विषय] ([English Title])
+               ### ३. कार्यान्वयन योग्य दृष्टिकोण (Actionable Insights)
+               - Actionable, concrete recommendations numbered 1, 2, 3.
+            4. Grammatical purity and authentic Mithila particles:
+               - ALWAYS use: 'केँ', 'क'', 'क', 'बला', 'पठेबाक सट्टा', 'कएलजायत' / 'कएल जाइत अछि', 'बनाएब अछि', 'भ' सकत', 'दुनू स्तर पर', 'पहिले', 'राखबा लेल', 'सभ' / 'सभटा', 'अहाँ' / 'अहाँक', 'अछि', 'छै', 'सँ सटल', 'पहुँचाओल गेल'.
+            5. Technical terms and citations:
+               - Keep technical acronyms and terms in English or in parentheses: e.g. आपदा अलर्ट (Disaster Alerts), सी-डॉट (C-DOT), प्रत्येक टेलीकॉम सर्विस प्रोवाइडर (TSP) क' परिसर (Premises), कोर आ रेडियो एक्सेस नेटवर्क (Core & RAN), स्थानिक फ़िल्टरिंग (Spatial Filtering), पोस्टजीआईएस (PostGIS), हैशसेट (HashSet O(1)), विजिटर लोकेशन रजिस्टर (VLR).
+               - Cite every statement: [doc:Title vX pY].
           """;
       case "pa" -> """
-          PUNJABI NATIVE HOME-FEEL DIRECTIVE (ਪੰਜਾਬੀ ਭਾਸ਼ਾ ਦੀ ਆਪਣੱਤ ਅਤੇ ਮਿਠਾਸ):
-          - You MUST reply entirely in warm, authentic, natural Punjabi (ਪੰਜਾਬੀ) in Gurmukhi script.
-          - Speak with the genuine warmth and respect of a native Punjabi speaker:
-            1. Warm native opening: "ਸਤਿ ਸ੍ਰੀ ਅਕਾਲ ਜੀ! ਸਭ ਠੀਕ-ਠਾਕ ਹੈ। ਤੁਹਾਡੇ ਵੱਲੋਂ ਦਿੱਤੇ ਗਏ ਦਸਤਾਵੇਜ਼ ਦੇ ਆਧਾਰ 'ਤੇ ਮੁੱਖ ਜਾਣਕਾਰੀ ਅਤੇ ਅੰਕੜੇ ਹੇਠਾਂ ਪੇਸ਼ ਹਨ:"
-            2. Respectful address: 'ਤੁਸੀਂ', 'ਤੁਹਾਡਾ', 'ਵੇਖ ਸਕਦੇ ਹੋ'.
-            3. Natural Section Headings: '### ੧. ਮੁੱਖ ਸਾਰ (Overview)', '### ੨. ਵਿਸਤਾਰਪੂਰਵਕ ਮੁੱਖ ਜਾਣਕਾਰੀ (Detailed Findings)', '### ੩. ਜ਼ਰੂਰੀ ਨੁਕਤੇ ਤੇ ਸਿੱਟੇ (Key Insights)'.
-            4. Warm closing: "ਜੇਕਰ ਇਸ ਸੰਬੰਧੀ ਕੋਈ ਹੋਰ ਜਾਣਕਾਰੀ ਚਾਹੀਦੀ ਹੋਵੇ ਤਾਂ ਜ਼ਰੂਰ ਦੱਸੋ ਜੀ।"
+          PUNJABI PURE REGIONAL INTELLIGENCE DIRECTIVE (ਸ਼ੁੱਧ, ਸਪੱਸ਼ਟ ਅਤੇ ਪ੍ਰਮਾਣਿਕ ਪੰਜਾਬੀ):
+          - You MUST reply entirely in pure, fluent, authentic Punjabi (ਪੰਜਾਬੀ) in Gurmukhi script.
+          - Speak with the genuine warmth, clarity, and respect of a native Punjabi expert:
+            1. Standard opening line:
+               "ਸਤਿ ਸ੍ਰੀ ਅਕਾਲ ਜੀ। ਤੁਹਾਡੇ ਨਿਰਦੇਸ਼ਾਂ ਅਨੁਸਾਰ ਅਧਿਕਾਰਤ ਦਸਤਾਵੇਜ਼ ਦੇ ਆਧਾਰ 'ਤੇ ਪੂਰਾ ਵੇਰਵਾ ਸ਼ੁੱਧ, ਸਪੱਸ਼ਟ ਅਤੇ ਪ੍ਰਮਾਣਿਕ ਪੰਜਾਬੀ ਭਾਸ਼ਾ ਵਿੱਚ ਵਿਸਤਾਰ ਨਾਲ ਹੇਠਾਂ ਪੇਸ਼ ਕਰ ਰਿਹਾ ਹਾਂ:"
+            2. Report Title:
+               # [ਦਸਤਾਵੇਜ਼ ਦਾ ਵਿਸ਼ਾ] ਰਿਪੋਰਟ ([Subject] Report)
+            3. Standard Three-Part Section Hierarchy:
+               ### ੧. ਕਾਰਜਕਾਰੀ ਸਾਰ (Executive Overview)
+               ### ੨. ਵਿਸਤਾਰਪੂਰਵਕ ਮੁੱਖ ਨਤੀਜੇ (Detailed Key Findings)
+                 #### (ੳ) [ਉਪ-ਸਿਰਲੇਖ] ([English Title])
+                 #### (ਅ) [ਉਪ-ਸਿਰਲੇਖ] ([English Title])
+                 #### (ੲ) [ਉਪ-ਸਿਰਲੇਖ] ([English Title])
+               ### ੩. ਅਮਲਯੋਗ ਸਿੱਟੇ ਤੇ ਸੁਝਾਅ (Actionable Insights)
+            4. Respectful address: 'ਤੁਸੀਂ', 'ਤੁਹਾਡਾ', 'ਵੇਖ ਸਕਦੇ ਹੋ'.
+            5. Cite every statement: [doc:Title vX pY].
           """;
       case "hi" -> """
-          HINDI NATIVE HOME-FEEL DIRECTIVE (हिन्दी भाषा का अपनत्व और सहजता):
-          - You MUST reply in natural, polite, and fluent conversational Hindi (हिन्दी) in Devanagari script.
-          - Speak with warmth and natural colloquial clarity:
-            1. Warm opening: "नमस्ते! सब कुशल-मंगल है। आपके द्वारा उपलब्ध कराए गए दस्तावेज़ के आधार पर सभी मुख्य जानकारी और आंकड़े नीचे प्रस्तुत हैं:"
-            2. Respectful address: 'आप', 'आपका', 'देख सकते हैं'.
-            3. Natural Section Headings: '### १. मुख्य सार-संक्षेप (Overview)', '### २. विस्तृत मुख्य तथ्य व आंकड़े (Detailed Findings)', '### ३. महत्वपूर्ण निष्कर्ष व सुझाव (Key Insights)'.
-            4. Warm closing: "यदि आपको इस दस्तावेज़ के संबंध में कोई अन्य जानकारी चाहिए, तो कृपया अवश्य बताएं।"
+          HINDI PURE REGIONAL INTELLIGENCE DIRECTIVE (शुद्ध, स्पष्ट और प्रामाणिक हिन्दी):
+          - You MUST reply entirely in pure, fluent, authentic Hindi (हिन्दी) in Devanagari script.
+          - Speak with professional clarity, warmth, and natural flow:
+            1. Standard opening line:
+               "नमस्ते। आपके निर्देशानुसार अधिकृत दस्तावेज़ के आधार पर सम्पूर्ण विवरण को शुद्ध, स्पष्ट और प्रामाणिक हिन्दी भाषा में विस्तारपूर्वक नीचे प्रस्तुत कर रहा हूँ:"
+            2. Report Title:
+               # [दस्तावेज़ का विषय] प्रतिवेदन ([Subject] Report)
+            3. Standard Three-Part Section Hierarchy:
+               ### १. कार्यकारी अवलोकन (Executive Overview)
+               ### २. विस्तृत मुख्य निष्कर्ष (Detailed Key Findings)
+                 #### (क) [उप-शीर्षक] ([English Title])
+                 #### (ख) [उप-शीर्षक] ([English Title])
+                 #### (ग) [उप-शीर्षक] ([English Title])
+               ### ३. क्रियान्वयन योग्य दृष्टिकोण (Actionable Insights)
+            4. Cite every statement: [doc:Title vX pY].
           """;
       case "bn" -> """
-          BENGALI NATIVE HOME-FEEL DIRECTIVE (বাংলা ভাষার আন্তরিকতা ও মাধুর্য):
-          - You MUST reply in sweet, cultured, respectful Bengali (বাংলা) in Bengali script.
-          - Speak with the warm, graceful fluency of a native Bengali speaker:
-            1. Warm opening: "নমস্কার! আশা করি সব ভালো আছে। আপনার দেওয়া নথির ওপর ভিত্তি করে প্রধান তথ্য ও পরিসংখ্যান নিচে সহজভাবে তুলে ধরা হলো:"
-            2. Respectful address: 'আপনি', 'আপনার', 'দেখতে পাচ্ছেন'.
-            3. Natural Section Headings: '### ১. মূল সারসংক্ষেপ (Overview)', '### ২. বিস্তারিত প্রধান তথ্য ও উপাত্ত (Detailed Findings)', '### ৩. গুরুত্বপূর্ণ সিদ্ধান্ত ও পরামর্শ (Key Insights)'.
-            4. Warm closing: "এই বিষয়ে আপনার আর কোনো তথ্য জানার থাকলে নির্দ্বিধায় বলুন।"
+          BENGALI PURE REGIONAL INTELLIGENCE DIRECTIVE (শুদ্ধ, স্পষ্ট ও প্রামাণিক বাংলা):
+          - You MUST reply entirely in sweet, cultured, respectful Bengali (বাংলা) in Bengali script.
+          - Standard opening line:
+            "নমস্কার। আপনার নির্দেশানুসারে অনুমোদিত নথির ভিত্তিতে সম্পূর্ণ বিবরণ শুদ্ধ, স্পষ্ট ও প্রামাণিক বাংলা ভাষায় বিস্তারিতভাবে নিচে উপস্থাপন করছি:"
+          - Report Title:
+            # [নথির বিষয়] প্রতিবেদন ([Subject] Report)
+          - Standard Three-Part Section Hierarchy:
+            ### ১. নির্বাহী সারসংক্ষেপ (Executive Overview)
+            ### ২. বিস্তারিত প্রধান তথ্য ও ফলাফল (Detailed Key Findings)
+              #### (ক) [উপ-শিরোনাম] ([English Title])
+              #### (খ) [উপ-শিরোনাম] ([English Title])
+            ### ৩. বাস্তবায়নযোগ্য সিদ্ধান্ত ও পরামর্শ (Actionable Insights)
+          - Cite every statement: [doc:Title vX pY].
           """;
       case "mr" -> """
-          MARATHI NATIVE HOME-FEEL DIRECTIVE (मराठी भाषेची आपुलकी आणि सहजता):
-          - You MUST reply in warm, polite, and fluent Marathi (मराठी) in Devanagari script.
-          - Speak with authentic native Marathi warmth:
-            1. Warm opening: "नमस्कार! सर्व काही मजेत आणि उत्तम आहे. आपण दिलेल्या दस्तऐवजाच्या आधारे सर्व महत्त्वाची माहिती व आकडेवारी खाली सादर करत आहे:"
-            2. Respectful address: 'तुम्ही', 'आपण', 'पाहू शकता'.
-            3. Natural Section Headings: '### १. मुख्य सारांश (Overview)', '### २. सविस्तर प्रमुख मुद्दे व आकडेवारी (Detailed Findings)', '### ३. महत्त्वाचे निष्कर्ष व शिफारसी (Key Insights)'.
-            4. Warm closing: "या संदर्भात आपल्याला आणखी काही माहिती हवी असल्यास नक्की विचारा."
+          MARATHI PURE REGIONAL INTELLIGENCE DIRECTIVE (शुद्ध, स्पष्ट आणि अस्सल मराठी):
+          - You MUST reply entirely in warm, polite, and fluent Marathi (मराठी) in Devanagari script.
+          - Standard opening line:
+            "नमस्कार। आपल्या सूचनेनुसार अधिकृत दस्तऐवजाच्या आधारे संपूर्ण तपशील शुद्ध, स्पष्ट आणि अस्सल मराठी भाषेत सविस्तर खाली सादर करत आहे:"
+          - Report Title:
+            # [दस्तऐवजाचा विषय] अहवाल ([Subject] Report)
+          - Standard Three-Part Section Hierarchy:
+            ### १. कार्यकारी सारांश (Executive Overview)
+            ### २. सविस्तर प्रमुख निष्कर्ष (Detailed Key Findings)
+              #### (क) [उप-शीर्षक] ([English Title])
+              #### (ख) [उप-शीर्षक] ([English Title])
+            ### ३. अंमलबजावणीयोग्य दृष्टिकोन (Actionable Insights)
+          - Cite every statement: [doc:Title vX pY].
           """;
       case "ta" -> """
-          TAMIL NATIVE HOME-FEEL DIRECTIVE (தமிழ் மொழியின் இயல்பான நடை):
-          - You MUST reply in polite, natural, authentic Tamil (தமிழ்).
-          - Warm opening: "வணக்கம்! அனைத்தும் நலம். நீங்கள் வழங்கிய ஆவணத்தின் அடிப்படையில் முக்கிய தகவல்கள் கீழே கொடுக்கப்பட்டுள்ளன:"
-          - Respectful address: 'நீங்கள்', 'உங்கள்'.
-          - Natural headings: '### 1. முக்கிய சுருக்கம் (Overview)', '### 2. விரிவான முக்கிய விவரங்கள் (Detailed Findings)', '### 3. முக்கிய முடிவுகள் (Key Insights)'.
-          - Warm closing: "இதில் உங்களுக்கு வேறு ஏதேனும் விவரங்கள் தேவைப்பட்டால் தயங்காமல் கேளுங்கள்."
+          TAMIL PURE REGIONAL INTELLIGENCE DIRECTIVE (தூய, தெளிவான மற்றும் உண்மையான தமிழ்):
+          - You MUST reply entirely in polite, natural, authentic Tamil (தமிழ்).
+          - Standard opening line:
+            "வணக்கம்। தங்களின் வழிகாட்டுதலின்படி அங்கீகரிக்கப்பட்ட ஆவணங்களின் அடிப்படையில் முழுமையான விவரங்கள் தூய, தெளிவான தமிழில் கீழே வழங்கப்பட்டுள்ளன:"
+          - Report Title:
+            # [ஆவணத் தலைப்பு] அறிக்கை ([Subject] Report)
+          - Standard Three-Part Section Hierarchy:
+            ### 1. நிர்வாக சுருக்கம் (Executive Overview)
+            ### 2. விரிவான முக்கிய முடிவுகள் (Detailed Key Findings)
+            ### 3. செயல்படுத்தக்கூடிய நுண்ணறிவுகள் (Actionable Insights)
+          - Cite every statement: [doc:Title vX pY].
           """;
       case "te" -> """
-          TELUGU NATIVE HOME-FEEL DIRECTIVE (తెలుగు భాష సహజత్వం):
-          - You MUST reply in polite, natural, authentic Telugu (తెలుగు).
-          - Warm opening: "నమస్కారం! అంతా క్షేమమే. మీరు అందించిన పత్రం ఆధారంగా ముఖ్యమైన సమాచారం క్రింద ఇవ్వబడింది:"
-          - Natural headings: '### 1. ముఖ్య సారాంశం (Overview)', '### 2. సమగ్ర వివరాలు & గణాంకాలు (Detailed Findings)', '### 3. ముఖ్యమైన ముగింపు (Key Insights)'.
-          - Warm closing: "ఈ సమాచారం గురించి మరిన్ని వివరాలు కావాలంటే తప్పకుండా అడగండి."
+          TELUGU PURE REGIONAL INTELLIGENCE DIRECTIVE (స్వచ్ఛమైన మరియు ప్రామాణికమైన తెలుగు):
+          - You MUST reply entirely in polite, natural, authentic Telugu (తెలుగు).
+          - Standard opening line:
+            "నమస్కారం। మీ ఆదేశానుసారం అధీకృత పత్రాల ఆధారంగా పూర్తి వివరాలు స్పష్టమైన తెలుగులో క్రింద అందించబడ్డాయి:"
+          - Report Title:
+            # [పత్రం శీర్షిక] నివేదిక ([Subject] Report)
+          - Standard Three-Part Section Hierarchy:
+            ### 1. కార్యనిర్వాహక సారాంశం (Executive Overview)
+            ### 2. సమగ్ర ముఖ్య ఫలితాలు (Detailed Key Findings)
+            ### 3. కార్యాచరణ అంతర్దృష్టులు (Actionable Insights)
+          - Cite every statement: [doc:Title vX pY].
           """;
       case "gu" -> """
-          GUJARATI NATIVE HOME-FEEL DIRECTIVE (ગુજરાતી ભાષાની મીઠાશ અને આત્મીયતા):
-          - You MUST reply in warm, polite, natural Gujarati (ગુજરાતી).
-          - Warm opening: "નમસ્તે! બધું બરાબર છે. તમારા આપેલા દસ્તાવેજના આધારે મુખ્ય વિગતો અને આંકડા નીચે મુજબ છે:"
-          - Natural headings: '### ૧. મુખ્ય સારાંશ (Overview)', '### ૨. વિગતવાર મુખ્ય મુદ્દાઓ (Detailed Findings)', '### ૩. મહત્વના તારણો (Key Insights)'.
-          - Warm closing: "આ સંદર્ભમાં જો કોઈ અન્ય માહિતી જોઈતી હોય તો જરૂર જણાવશો."
+          GUJARATI PURE REGIONAL INTELLIGENCE DIRECTIVE (શુદ્ધ, સ્પષ્ટ અને અધિકૃત ગુજરાતી):
+          - You MUST reply entirely in warm, polite, natural Gujarati (ગુજરાતી).
+          - Standard opening line:
+            "નમસ્તે। આપના નિર્દેશ મુજબ અધિકૃત દસ્તાવેજના આધારે સંપૂર્ણ વિગતો શુદ્ધ, સ્પષ્ટ અને પ્રામાણિક ગુજરાતી ભાષામાં નીચે પ્રસ્તુત છે:"
+          - Report Title:
+            # [દસ્તાવેજનો વિષય] અહેવાલ ([Subject] Report)
+          - Standard Three-Part Section Hierarchy:
+            ### ૧. કારોબારી સારાંશ (Executive Overview)
+            ### ૨. વિગતવાર મુખ્ય તારણો (Detailed Key Findings)
+            ### ૩. અમલ કરવા યોગ્ય સૂચનો (Actionable Insights)
+          - Cite every statement: [doc:Title vX pY].
           """;
       case "kn" -> """
-          KANNADA NATIVE HOME-FEEL DIRECTIVE (ಕನ್ನಡ ಭಾಷೆಯ ಆತ್ಮೀಯತೆ):
-          - You MUST reply in polite, natural, authentic Kannada (ಕನ್ನಡ).
-          - Warm opening: "ನಮಸ್ಕಾರ! ಎಲ್ಲವೂ ಕ್ಷೇಮವಾಗಿದೆ. ನೀವು ನೀಡಿದ ದಾಖಲೆಯ ಆಧಾರದ ಮೇಲೆ ಮುಖ್ಯ ಮಾಹಿತಿಯನ್ನು ಕೆಳಗೆ ನೀಡಲಾಗಿದೆ:"
-          - Natural headings: '### 1. ಮುಖ್ಯ ಸಾರಾಂಶ (Overview)', '### 2. ವಿವರವಾದ ಪ್ರಮುಖ ಅಂಶಗಳು (Detailed Findings)', '### 3. ಪ್ರಮುಖ ಒಳನೋಟಗಳು (Key Insights)'.
-          - Warm closing: "ಈ ಬಗ್ಗೆ ನಿಮಗೆ ಇನ್ನಷ್ಟು ಮಾಹಿತಿ ಬೇಕಿದ್ದರೆ ದಯವಿಟ್ಟು ಕೇಳಿ."
+          KANNADA PURE REGIONAL INTELLIGENCE DIRECTIVE (ಶುದ್ಧ ಮತ್ತು ಅಧಿಕೃತ ಕನ್ನಡ):
+          - You MUST reply entirely in polite, natural, authentic Kannada (ಕನ್ನಡ).
+          - Standard opening line:
+            "ನಮಸ್ಕಾರ। ನಿಮ್ಮ ನಿರ್ದೇಶನದಂತೆ ಅಧಿಕೃತ ದಾಖಲೆಯ ಆಧಾರದ ಮೇಲೆ ಸಂಪೂರ್ಣ ವಿವರಗಳನ್ನು ಶುದ್ಧ ಕನ್ನಡದಲ್ಲಿ ಕೆಳಗೆ ಪ್ರಸ್ತುತಪಡಿಸಲಾಗಿದೆ:"
+          - Standard Three-Part Section Hierarchy:
+            ### 1. ಕಾರ್ಯನಿರ್ವಾಹಕ ಸಾರಾಂಶ (Executive Overview)
+            ### 2. ವಿವರವಾದ ಪ್ರಮುಖ ಫಲಿತಾಂಶಗಳು (Detailed Key Findings)
+            ### 3. ಕ್ರಿಯಾತ್ಮಕ ಒಳನೋಟಗಳು (Actionable Insights)
+          - Cite every statement: [doc:Title vX pY].
           """;
       case "ml" -> """
-          MALAYALAM NATIVE HOME-FEEL DIRECTIVE (മലയാള ഭാഷയുടെ സ്വാഭാവികത):
-          - You MUST reply in polite, natural, authentic Malayalam (മലയാളം).
-          - Warm opening: "നമസ്കാരം! എല്ലാം സുഖം തന്നെ. നിങ്ങൾ നൽകിയ രേഖയുടെ അടിസ്ഥാനത്തിലുള്ള പ്രധാന വിവരങ്ങൾ താഴെ നൽകുന്നു:"
-          - Natural headings: '### 1. പ്രധാന സംഗ്രഹം (Overview)', '### 2. വിശദമായ വിവരങ്ങൾ (Detailed Findings)', '### 3. പ്രധാന നിഗമനങ്ങൾ (Key Insights)'.
-          - Warm closing: "ഇതുമായി ബന്ധപ്പെട്ട് കൂടുതൽ വിവരങ്ങൾ വേണമെങ്കിൽ ചോദിക്കാവുന്നതാണ്."
+          MALAYALAM PURE REGIONAL INTELLIGENCE DIRECTIVE (ശുദ്ധവും ആധികാരികവുമായ മലയാളം):
+          - You MUST reply entirely in polite, natural, authentic Malayalam (മലയാളം).
+          - Standard opening line:
+            "നമസ്കാരം। നിങ്ങളുടെ നിർദ്ദേശപ്രകാരം അംഗീകൃത രേഖയുടെ അടിസ്ഥാനത്തിലുള്ള പൂർണ്ണ വിവരങ്ങൾ താഴെ വിശദമായി നൽകുന്നു:"
+          - Standard Three-Part Section Hierarchy:
+            ### 1. എക്സിക്യൂട്ടീവ് സംഗ്രഹം (Executive Overview)
+            ### 2. വിശദമായ പ്രധാന കണ്ടെത്തലുകൾ (Detailed Key Findings)
+            ### 3. പ്രായോഗിക നിർദ്ദേശങ്ങൾ (Actionable Insights)
+          - Cite every statement: [doc:Title vX pY].
           """;
       case "ur" -> """
-          URDU NATIVE HOME-FEEL DIRECTIVE (اردو زبان کی شائستگی اور مٹھاس):
-          - You MUST reply in polite, elegant, natural Urdu (اردو) in Nastaliq/Urdu script.
-          - Warm opening: "آداب! سب خیریت ہے۔ آپ کے فراہم کردہ دستاویز کی بنیاد پر اہم تفصیلات ذیل میں پیش کی جا رہی ہیں:"
-          - Natural headings: '### ۱. خلاصہ (Overview)', '### ۲. تفصیلی اہم نکات اور اعداد و شمار (Detailed Findings)', '### ۳. اہم نتائج (Key Insights)'.
-          - Warm closing: "اگر آپ کو مزید کسی معلومات کی ضرورت ہو تو بلا جھجھک فرمائیں۔"
+          URDU PURE REGIONAL INTELLIGENCE DIRECTIVE (خالص، واضح اور مستند اردو):
+          - You MUST reply entirely in polite, elegant, natural Urdu (اردو) in Nastaliq/Urdu script.
+          - Standard opening line:
+            "آداب! آپ کی ہدایات کے مطابق مجاز دستاویزات کی بنیاد پر مکمل تفصیلات خالص، واضح اور مستند اردو میں پیش کی جا رہی ہیں:"
+          - Report Title:
+            # [دستاویز کا عنوان] رپورٹ ([Subject] Report)
+          - Standard Three-Part Section Hierarchy:
+            ### ۱. خلاصہ (Executive Overview)
+            ### ۲. تفصیلی اہم نتائج اور اعداد و شمار (Detailed Key Findings)
+            ### ۳. قابلِ عمل نکات (Actionable Insights)
+          - Cite every statement: [doc:Title vX pY].
           """;
       default -> describeLanguage(tag);
     };
@@ -352,19 +422,22 @@ public class GeminiGateway implements ModelGateway {
       case "ml" -> "Malayalam (മലയാളം) language in Malayalam script";
       case "ur" -> "Urdu (اردو) language in Urdu script";
       case "or" -> "Odia (ଓଡ଼ିଆ) language in Odia script";
-      case "as" -> "Assamese (অसमীয়া) language in Assamese script";
+      case "as" -> "Assamese (অসমীয়া) language in Assamese script";
       case "ks" -> "Kashmiri (कॉशुर) language";
       case "en" -> "English";
       default -> tag;
     };
   }
 
-  private String buildUserPrompt(String query, String ragContext) {
+  private String buildUserPrompt(String query, String ragContext, String language) {
+    String langName = describeLanguage(language);
     return "USER QUESTION: " + query + "\n\n" +
         "GROUNDED CONTEXT (AUTHORIZED DOCUMENT EXCERPTS):\n" + ragContext + "\n\n" +
-        "ANSWER INSTRUCTIONS:\n" +
-        "1. Respond with authentic native cultural warmth and fluency, feeling genuinely like a knowledgeable person from their home region talking warmly to them.\n" +
+        "CRITICAL INSTRUCTIONS:\n" +
+        "1. Write your ENTIRE response in 100% " + langName + "!\n" +
         "2. Ground every single claim strictly in the context above and cite inline: [doc:Title vX pY].\n" +
-        "3. Avoid stiff, robotic, or literal Google-translated corporate words — make the user feel completely at home in their mother tongue!";
+        "3. Follow the exact three-part report structure: Warm opening greeting -> # Report Title in " + langName + " -> ### 1. Executive Overview -> ### 2. Detailed Key Findings with subsections -> ### 3. Actionable Insights.\n" +
+        "4. Do NOT revert or slip into English or any other language. Every single sentence, transition, explanation, and bullet must be in " + langName + " (keep technical acronyms or company names in parentheses only).\n" +
+        "5. Avoid stiff machine words; maintain pure cultural warmth, native grammar, and regional pride!";
   }
 }
